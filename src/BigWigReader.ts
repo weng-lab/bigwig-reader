@@ -1,8 +1,7 @@
 import { DataLoader, BufferedDataLoader } from "./DataLoader";
 import { BinaryParser } from "./BinaryParser";
-import { loadHeaderData, HeaderData, ZoomLevelHeader, FileType } from "./BigWigHeaderReader";
+import { loadHeaderData, HeaderData } from "./BigWigHeaderReader";
 import { inflate } from "pako"
-import { start } from "repl";
 
 export interface BigWigData {
     chr: string,
