@@ -1,0 +1,22 @@
+{
+  "name": "bigwig-reader",
+  "version": "1.0.0",
+  "main": "main.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^23.3.1",
+    "@types/node": "^10.9.4",
+    "@types/pako": "^1.0.0",
+    "jest": "^23.5.0",
+    "ts-jest": "^23.1.4",
+    "typescript": "^3.0.1"
+  },
+  "dependencies": {
+    "axios": "^0.18.0",
+    "pako": "^1.0.6"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  }
+}
