@@ -22,7 +22,8 @@ export interface HeaderData {
 }
 
 export enum FileType {
-    BigWig, BigBed
+    BigWig = "BigWig", 
+    BigBed = "BigBed"
 }
 
 /**

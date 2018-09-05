@@ -3,4 +3,5 @@
 # cd to project root directory
 cd "$(dirname "$(dirname "$0")")"
 
-docker-compose down
+yarn install
+yarn build

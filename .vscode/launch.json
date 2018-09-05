@@ -12,7 +12,7 @@
                 "${workspaceRoot}/node_modules/.bin/jest",
                 "--runInBand",
                 "--config",
-                "${workspaceRoot}/jest.config.json"
+                "${workspaceRoot}/jest.config.js"
               ],
               "windows": {
                 "args": [
@@ -20,11 +20,11 @@
                   "${workspaceRoot}/node_modules/jest/bin/jest.js",
                   "--runInBand",
                   "--config",
-                  "${workspaceRoot}/jest.config.json"          
+                  "${workspaceRoot}/jest.config.js"
                 ],
               },
             //"runtimeArgs": ["--inspect-brk", "${workspaceRoot}/node_modules/.bin/jest", "--runInBand", "--coverage", "false", "--config",
-            //    "${workspaceRoot}/jest.config.json"],
+            //    "${workspaceRoot}/jest.config.js"],
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen"
         }

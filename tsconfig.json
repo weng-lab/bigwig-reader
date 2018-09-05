@@ -12,6 +12,6 @@
         "strictNullChecks": true
     },
     "include": [
-        "src/**/*"
+        "src/**/*", "jest.config.js"
     ]
   }

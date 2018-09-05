@@ -1,2 +1,6 @@
 #!/bin/sh
-docker-compose -f resources/docker-compose.yml up -d
+
+# cd to project root directory
+cd "$(dirname "$(dirname "$0")")"
+
+docker-compose up -d
