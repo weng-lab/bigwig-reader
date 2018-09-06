@@ -11,6 +11,6 @@ deploy:
   provider: npm
   email: jasonbrooks85@gmail.com
   api_key: $NPM_TOKEN
+  skip_cleanup: true
   on:
     tags: true
-    skip_cleanup: true
