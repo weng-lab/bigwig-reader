@@ -5,6 +5,9 @@ Brought to you by UMass Medical School, Weng Lab.
 
 ## To use
 ```typescript
+    import { AxiosDataLoader, BigWigReader, HeaderData, BigWigData, BigBedData, BigZoomData } from "bigwig-reader";
+    import Axios from "axios";
+
     // Create a loader. AxiosDataLoader handles loading data ranges for http requests.
     // Provide your own instance of Axios to add your own configurations.
     // Create your own implementation of DataLoader for loading data other ways, 
