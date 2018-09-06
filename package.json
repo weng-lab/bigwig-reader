@@ -4,6 +4,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
+  "files": [
+    "/dist"
+  ],
   "devDependencies": {
     "@types/jest": "^23.3.1",
     "@types/node": "^10.9.4",

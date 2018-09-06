@@ -1,14 +1,16 @@
 dist: trusty
 sudo: required
-
 language: node_js
 node_js: 10.9
-
 services:
   - docker
-
 script:
   - scripts/test.sh
   - scripts/build.sh
-
-#TODO: Add Deploy
+deploy:
+  provider: npm
+  email: jasonbrooks85@gmail.com
+  api_key: $NPM_TOKEN
+  on:
+    tags: true
+    skip_cleanup: true
