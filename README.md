@@ -17,7 +17,7 @@ import { AxiosDataLoader, BigWigReader } from "bigwig-reader";
 ```
 
 ### Creating readers
-You will need to create a `DataLoader` and `BigWigReader` for each file you want to read. DataLoaders handle IO. Readers are top level objects that 
+You will need to create a `DataLoader` and `BigWigReader` for each file you want to read. DataLoaders handle IO. Readers are top level objects that read and parse data.
 
 `AxiosDataLoader` is a provided `DataLoader` that handles loading data ranges for http requests. It's constructor allows you to optionally provide your own instance of Axios to add your own configurations. For example, if you want to add your own custom auth headers.
 
