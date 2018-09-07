@@ -1,6 +1,10 @@
 {
   "name": "bigwig-reader",
+<<<<<<< HEAD
   "version": "1.0.4",
+=======
+  "version": "1.0.3",
+>>>>>>> 3e79208f3be8c23ef4e6da05f98e060ffa8ccebd
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
