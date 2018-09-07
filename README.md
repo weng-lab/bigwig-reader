@@ -1,9 +1,15 @@
-# Typescript BigWig Reader
+# BigWig Reader
 A Typescript library for reading BigWig and BigBed files. Heavily influenced by [igv.js](https://github.com/igvteam/igv.js). For use in the browser or on Node.js.
 
 Brought to you by UMass Medical School, Weng Lab.
 
-## To use
+## Installation
+
+For npm use: `npm install bigwig-reader --save`
+
+For yarn use: `yarn add bigwig-reader`
+
+## Usage
 ```typescript
     import { AxiosDataLoader, BigWigReader, HeaderData, BigWigData, BigBedData, BigZoomData } from "bigwig-reader";
     import Axios from "axios";
@@ -27,7 +33,8 @@ Brought to you by UMass Medical School, Weng Lab.
     const bedData: BigBedData[] = await reader.readBigBedData("chr21", 10_000_000, "chr21", 20_000_000);
 
     // Get zoom data (from BigWig or BigBed files)
-    const zoomData: BigZoomData[] = await reader.readZoomData("chr2", 0, "chr6", 1000, 9);
+    // You can find Zoom Level Index in HeaderData.zoomLevelHeaders.index
+    const zoomData: BigZoomData[] = await reader.readZoomData("chr2", 0, "chr6", 1000, /* Zoom Level Index */ 9);
 ```
 
 ## For contributers

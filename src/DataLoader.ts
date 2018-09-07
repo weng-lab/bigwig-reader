@@ -46,7 +46,7 @@ export class AxiosDataLoader implements DataLoader {
 /**
  * Error that get's returned when we try to read data from a file that's out of bounds.
  */
-export class OutOfRangeError extends Error {
+class OutOfRangeError extends Error {
     constructor(public start: number, public size?: number){
         super();
     }
@@ -72,11 +72,11 @@ export class BufferedDataLoader {
             return bufferedData;
         }
 
-        // If we're out of range, it could mean reaching the end of the file, so retry without a size bound.
         let data;
         try {
             data = await this.dataLoader.load(start, this.bufferSize);
         } catch (e) {
+            // If we're out of range, it could mean reaching the end of the file, so retry without a size bound.
             if (e instanceof OutOfRangeError) {
                 data = await this.dataLoader.load(start);
             } else {
