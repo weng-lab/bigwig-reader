@@ -1,4 +1,4 @@
-import { AxiosInstance, AxiosResponse } from "axios";
+import Axios, { AxiosInstance, AxiosResponse } from "axios";
 
 /**
  * Interface for loading data.
@@ -20,7 +20,7 @@ export class AxiosDataLoader implements DataLoader {
 
     private cachedFileSize: number|undefined = undefined;
 
-    constructor(private url: string, private axios: AxiosInstance) {}
+    constructor(private url: string, private axios: AxiosInstance = Axios.create()) {}
 
     async load(start: number, size?: number): Promise<ArrayBuffer> {
         const response: AxiosResponse<ArrayBuffer|Buffer> = await this.axios.get(this.url, { 
@@ -30,7 +30,7 @@ export class AxiosDataLoader implements DataLoader {
 
         // If we get an out of range response
         if (416 == response.status) {
-            throw new OutOfRangeError(start, size);
+            throw new OutOfRangeError(this.url, start, size);
         }
 
         // If this is running on node.js axios will return node.js "Buffer" objects for arraybuffer requests
@@ -47,8 +47,8 @@ export class AxiosDataLoader implements DataLoader {
  * Error that get's returned when we try to read data from a file that's out of bounds.
  */
 class OutOfRangeError extends Error {
-    constructor(public start: number, public size?: number){
-        super();
+    constructor(public resource: string, public start: number, public size?: number){
+        super(`Request on ${resource} out of range. Range given: ${start}-${size||''}`);
     }
 }
 
