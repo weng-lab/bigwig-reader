@@ -15,10 +15,10 @@ For yarn use: `yarn add bigwig-reader`
     import Axios from "axios";
 
     // Create a loader. AxiosDataLoader handles loading data ranges for http requests.
-    // Provide your own instance of Axios to add your own configurations.
+    // Optionally provide your own instance of Axios to add your own configurations.
     // Create your own implementation of DataLoader for loading data other ways, 
     // ie. from file system, ftp, cloud storage, etc...
-    const loader = new AxiosDataLoader("http://localhost/sample.bigwig", Axios.create());
+    const loader = new AxiosDataLoader("http://localhost/sample.bigwig", /* Optional */ Axios.create());
 
     // Create an instance of BigWigReader.
     const reader = new BigWigReader(loader);
