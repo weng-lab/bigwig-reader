@@ -10,9 +10,6 @@ import { AxiosInstance, AxiosResponse } from "axios";
 export interface DataLoader {
     // Loads data for the given range
     load: (start: number, size?: number) => Promise<ArrayBuffer>;
-    
-    // Should return file size in bytes
-    fileSize: () => Promise<number>;
 }
 
 /**
@@ -31,6 +28,11 @@ export class AxiosDataLoader implements DataLoader {
             headers: { "Range": `bytes=${start}-${size ? start+size-1 : ""}`}
         });
 
+        // If we get an out of range response
+        if (416 == response.status) {
+            throw new OutOfRangeError(start, size);
+        }
+
         // If this is running on node.js axios will return node.js "Buffer" objects for arraybuffer requests
         if (response.data instanceof Buffer) {
             return new Uint8Array(response.data).buffer as ArrayBuffer;
@@ -39,13 +41,15 @@ export class AxiosDataLoader implements DataLoader {
         }
     }
 
-    async fileSize(): Promise<number> {
-        if (undefined === this.cachedFileSize) {
-            this.cachedFileSize = parseInt((await this.axios.head(this.url)).headers['content-length']);
-        }
-        return this.cachedFileSize;
-    }
+}
 
+/**
+ * Error that get's returned when we try to read data from a file that's out of bounds.
+ */
+export class OutOfRangeError extends Error {
+    constructor(public start: number, public size?: number){
+        super();
+    }
 }
 
 /**
@@ -59,7 +63,7 @@ export class BufferedDataLoader {
 
     private buffer?: LoaderBuffer;
 
-    constructor(private dataLoader: DataLoader, private bufferSize: number, private fileSize: number){}
+    constructor(private dataLoader: DataLoader, private bufferSize: number){}
 
     async load(start: number, size: number): Promise<ArrayBuffer> {
         // If the data is in the buffer, return it.
@@ -68,16 +72,28 @@ export class BufferedDataLoader {
             return bufferedData;
         }
 
-        // If the data is not in the buffer. Load some new data into the buffer.
-        const newBufferEnd = Math.min(start + this.bufferSize, this.fileSize);
-        const newBufferSize = newBufferEnd - start;
+        // If we're out of range, it could mean reaching the end of the file, so retry without a size bound.
+        let data;
+        try {
+            data = await this.dataLoader.load(start, this.bufferSize);
+        } catch (e) {
+            if (e instanceof OutOfRangeError) {
+                data = await this.dataLoader.load(start);
+            } else {
+                throw e;
+            }
+        }
+        
         this.buffer = {
-            data: await this.dataLoader.load(start, newBufferSize),
+            data: data,
             start: start,
-            size: newBufferSize
+            size: data.byteLength
         }
 
-        return this.buffer.data.slice(0, Math.min(newBufferSize, size));
+        if (size > data.byteLength) {
+            throw new Error(`Requested ${size} bytes but only got back ${this.buffer.size}`);
+        }
+        return this.buffer.data.slice(0, size);
     }
 
     /**

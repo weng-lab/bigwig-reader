@@ -16,13 +16,6 @@ const url = `http://localhost:8001/${filename}`
 const fsPath = path.join(__dirname, "..", "resources", "static", filename);
 
 describe("AxiosDataLoader", () => {
-    it("should return fileSize", async () => {
-        const loader = new AxiosDataLoader(url, Axios.create());
-        const fileSize = await loader.fileSize();
-        const fsFileSize = (await promisify(stat)(fsPath)).size;
-        expect(fileSize).toBe(fsFileSize);
-    });
-
     it("should load the correct data", async () => {
         const readStart = 0, readSize = 64;
         const loader = new AxiosDataLoader(url, Axios.create());
@@ -35,7 +28,7 @@ describe("AxiosDataLoader", () => {
 describe("BufferedDataLoader", () => {
     it("should buffer data for subsequent calls", async () => {
         const loader = new AxiosDataLoader(url, Axios.create());
-        const bufferedLoader = new BufferedDataLoader(loader, 250, await loader.fileSize());
+        const bufferedLoader = new BufferedDataLoader(loader, 250);
         const loaderSpy = jest.spyOn(loader, "load");
 
         let readStart = 100, readSize = 100;

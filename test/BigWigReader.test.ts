@@ -5,6 +5,7 @@ import { HeaderData } from "../src/BigWigHeaderReader";
 
 const testBWFilename = "testbw.bigwig";
 const testBBFilename = "testbb.bigbed";
+const testLargeBWFilename = "testbw-large.bigwig";
 
 describe("BigWigReader", () => {
     it("should get header", async () => {
@@ -99,4 +100,11 @@ describe("BigWigReader", () => {
         });
     });
     
+    it("should handle reading reading R+ trees with multiple layers.", async () => {
+        const loader = new AxiosDataLoader(`http://localhost:8001/${testLargeBWFilename}`, Axios.create());
+        const reader = new BigWigReader(loader);
+        const data = await reader.readBigBedData("chr21", 10_000_000, "chr21", 11_000_000);
+        expect(data.length).toBe(147);
+    });
+
 });

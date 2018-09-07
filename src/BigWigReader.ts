@@ -148,7 +148,7 @@ export class BigWigReader {
         }
 
         // Load all leaf nodes within given chr / base bounds for the R+ tree used for actually storing the data.
-        const bufferedLoader = new BufferedDataLoader(this.dataLoader, DEFAULT_BUFFER_SIZE, await this.dataLoader.fileSize());
+        const bufferedLoader = new BufferedDataLoader(this.dataLoader, DEFAULT_BUFFER_SIZE);
         const magic = new BinaryParser(await bufferedLoader.load(treeOffset, RPTREE_HEADER_SIZE)).getUInt();
         if (IDX_MAGIC !== magic) {
             throw new Error(`R+ tree not found at offset ${treeOffset}`);
@@ -196,7 +196,7 @@ async function loadLeafNodesForRPNode(bufferedLoader: BufferedDataLoader, little
     const bytesRequired = count * (isLeaf ? RPTREE_NODE_LEAF_ITEM_SIZE : RPTREE_NODE_CHILD_ITEM_SIZE);
     const nodeData: ArrayBuffer = await bufferedLoader.load(nodeDataOffset, bytesRequired);
 
-    const leafNodes: Array<RPLeafNode> = [];
+    let leafNodes: Array<RPLeafNode> = [];
     const nodeDataParser = new BinaryParser(nodeData, littleEndian);
     for (let i = 0; i < count; i++) {
         const nodeStartChr = nodeDataParser.getInt();
@@ -205,7 +205,7 @@ async function loadLeafNodesForRPNode(bufferedLoader: BufferedDataLoader, little
         const nodeEndBase = nodeDataParser.getInt();
         // If this node overlaps with the chr / base range provided
         const overlaps: boolean = ((endChromIndex > nodeStartChr) || (endChromIndex == nodeStartChr && endBase >= nodeStartBase)) &&
-            ((startChromIndex < nodeEndChr) || (startChromIndex == nodeEndChr && startBase <= nodeEndBase))
+            ((startChromIndex < nodeEndChr) || (startChromIndex == nodeEndChr && startBase <= nodeEndBase));
         if (isLeaf) {
             const leafNode: RPLeafNode = {
                 startChrom: nodeStartChr,
@@ -221,7 +221,7 @@ async function loadLeafNodesForRPNode(bufferedLoader: BufferedDataLoader, little
         } else {
             const childOffset = nodeDataParser.getLong();
             if (overlaps) {
-                leafNodes.concat(await loadLeafNodesForRPNode(bufferedLoader, littleEndian, childOffset, startChromIndex, startBase, endChromIndex, endBase));
+                leafNodes.push(... await loadLeafNodesForRPNode(bufferedLoader, littleEndian, childOffset, startChromIndex, startBase, endChromIndex, endBase));
             }
         }
     }
