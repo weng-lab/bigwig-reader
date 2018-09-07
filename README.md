@@ -10,31 +10,41 @@ For npm use: `npm install bigwig-reader --save`
 For yarn use: `yarn add bigwig-reader`
 
 ## Usage
+
+### Importing
 ```typescript
-    import { AxiosDataLoader, BigWigReader, HeaderData, BigWigData, BigBedData, BigZoomData } from "bigwig-reader";
-    import Axios from "axios";
+import { AxiosDataLoader, BigWigReader } from "bigwig-reader";
+```
 
-    // Create a loader. AxiosDataLoader handles loading data ranges for http requests.
-    // Optionally provide your own instance of Axios to add your own configurations.
-    // Create your own implementation of DataLoader for loading data other ways, 
-    // ie. from file system, ftp, cloud storage, etc...
-    const loader = new AxiosDataLoader("http://localhost/sample.bigwig", /* Optional */ Axios.create());
+### Creating readers
+You will need to create a `DataLoader` and `BigWigReader` for each file you want to read. DataLoaders handle IO. Readers are top level objects that 
 
-    // Create an instance of BigWigReader.
-    const reader = new BigWigReader(loader);
+`AxiosDataLoader` is a provided `DataLoader` that handles loading data ranges for http requests. It's constructor allows you to optionally provide your own instance of Axios to add your own configurations. For example, if you want to add your own custom auth headers.
 
-    // Get file header data
-    const header: HeaderData = await reader.getHeader();
-    
-    // Get unzoomed wig data (from BigWig files)
-    const wigData: BigWigData[] = await reader.readBigWigData("chr14", 19_485_000, "chr14", 20_000_100);
+Create your own implementation of DataLoader for loading data other ways, 
+ie. from file system, ftp, cloud storage, etc...
+```typescript
+const loader = new AxiosDataLoader("http://localhost/sample.bigwig", /* Optional */ Axios.create());
+const reader = new BigWigReader(loader);
+```
 
-    // Get unzoomed bed data (from BigBed files)
-    const bedData: BigBedData[] = await reader.readBigBedData("chr21", 10_000_000, "chr21", 20_000_000);
+### Reading data
+To read file header data do
+```typescript
+const header: HeaderData = await reader.getHeader();
+```
 
-    // Get zoom data (from BigWig or BigBed files)
-    // You can find Zoom Level Index in HeaderData.zoomLevelHeaders.index
-    const zoomData: BigZoomData[] = await reader.readZoomData("chr2", 0, "chr6", 1000, /* Zoom Level Index */ 9);
+To read data we have the following three functions. All read functions take the following arguments: `startChromosome`, `startBasePair`, `endChromosome`, `endBasePair`.
+```typescript
+// Get unzoomed wig data (from BigWig files)
+const wigData: BigWigData[] = await reader.readBigWigData("chr14", 19_485_000, "chr14", 20_000_100);
+
+// Get unzoomed bed data (from BigBed files)
+const bedData: BigBedData[] = await reader.readBigBedData("chr21", 10_000_000, "chr21", 20_000_000);
+
+// Get zoom data (from BigWig or BigBed files)
+// You can find Zoom Level Index in HeaderData.zoomLevelHeaders.index
+const zoomData: BigZoomData[] = await reader.readZoomData("chr2", 0, "chr6", 1000, /* Zoom Level Index */ 9);
 ```
 
 ## For contributers
