@@ -357,7 +357,6 @@ function decodeWigData(data: ArrayBuffer, filterStartChromIndex: number, filterS
             // Data is stored in Fixed Step format.
             value = binaryParser.getFloat();
             endBase = startBase + itemSpan;
-            startBase = itemStep;
         }
 
         if (chromIndex < filterStartChromIndex || (chromIndex === filterStartChromIndex && endBase < filterStartBase)) {
@@ -372,6 +371,12 @@ function decodeWigData(data: ArrayBuffer, filterStartChromIndex: number, filterS
             end: endBase,
             value: value
         });
+
+	if (1 !== type && 2 !== type) {
+	    // data is stored in Fixed Step format
+	    // only increment the start base once the last entry has been pushed
+	    startBase += itemStep;
+	}
     }
     return decodedData;
 }

@@ -4,6 +4,7 @@ import { BigWigReader } from "../src/BigWigReader";
 import { HeaderData } from "../src/BigWigHeaderReader";
 
 const testBWFilename = "testbw.bigwig";
+const testBWFixedStepName = "test.fixedstep.bigwig";
 const testBBFilename = "testbb.bigbed";
 const testLargeBWFilename = "testbw-large.bigwig";
 
@@ -81,6 +82,31 @@ describe("BigWigReader", () => {
         expect(data[0].exons.length).toBe(22);
         expect(data[0].exons[0].start).toBe(9_928_613);
         expect(data[0].exons[0].end).toBe(9_928_911);
+    });
+
+    it("should read fixed step bigwig data", async () => {
+        const loader = new AxiosDataLoader(`http://localhost:8001/${testBWFixedStepName}`, Axios.create());
+        const reader = new BigWigReader(loader);
+        const data = await reader.readBigWigData("chr3", 400_601, "chr3", 400_900);
+        expect(data.length).toBe(3);
+        expect(data[0]).toEqual({ 
+            chr: "chr3",
+            start: 400_600,
+            end: 400_700, 
+	    value: 11
+        });
+        expect(data[1]).toEqual({ 
+            chr: "chr3",
+            start: 400_700,
+            end: 400_800, 
+	    value: 22
+        });
+        expect(data[2]).toEqual({ 
+            chr: "chr3",
+            start: 400_800,
+            end: 400_900, 
+	    value: 33
+        });
     });
 
     it("should read zoom data from bigbed file.", async () => {
