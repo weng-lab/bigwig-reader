@@ -71,6 +71,7 @@ export interface ChromTree {
     itemCount: number;
     reserved: number;
     chromToId: { [chrom: string]: number };
+    chromSize: { [chrom: string]: number };
     idToChrom: Array<string>;
 }
 
@@ -176,6 +177,7 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
             itemCount: binaryParser.getLong(),
             reserved: binaryParser.getLong(),
             chromToId: {},
+            chromSize: {},
             idToChrom: []
         };
         buildChromTree(chromTree, binaryParser);
@@ -217,6 +219,7 @@ function buildChromTree(chromTree: ChromTree, binaryParser: BinaryParser, offset
 
             chromTree.chromToId[key] = chromId;
             chromTree.idToChrom[chromId] = key;
+            chromTree.chromSize[chromId] = chromSize;
         }
     } else {
         for (let i = 0; i < count; i++) {
