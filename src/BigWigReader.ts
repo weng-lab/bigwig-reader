@@ -359,18 +359,16 @@ function decodeWigData(data: ArrayBuffer, filterStartChromIndex: number, filterS
             endBase = startBase + itemSpan;
         }
 
-        if (chromIndex < filterStartChromIndex || (chromIndex === filterStartChromIndex && endBase < filterStartBase)) {
-            continue;
-        } else if (chromIndex > filterEndChromIndex || (chromIndex === filterEndChromIndex && startBase >= filterEndBase)) {
-            break;
+	if (chromIndex > filterEndChromIndex || (chromIndex === filterEndChromIndex && startBase >= filterEndBase)) {
+	    break; // past the end of the range; exit
+	} else if (!(chromIndex < filterStartChromIndex || (chromIndex === filterStartChromIndex && endBase < filterStartBase))) {
+	    decodedData.push({
+		chr: chrom,
+		start: startBase,
+		end: endBase,
+		value: value
+            }); // this is within the range (i.e. not before the first requested base); add this datapoint
         }
-
-        decodedData.push({
-            chr: chrom,
-            start: startBase,
-            end: endBase,
-            value: value
-        });
 
 	if (1 !== type && 2 !== type) {
 	    // data is stored in Fixed Step format
