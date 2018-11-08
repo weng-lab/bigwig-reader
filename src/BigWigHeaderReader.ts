@@ -219,7 +219,7 @@ function buildChromTree(chromTree: ChromTree, binaryParser: BinaryParser, offset
 
             chromTree.chromToId[key] = chromId;
             chromTree.idToChrom[chromId] = key;
-            chromTree.chromSize[chromId] = chromSize;
+            chromTree.chromSize[key] = chromSize;
         }
     } else {
         for (let i = 0; i < count; i++) {
