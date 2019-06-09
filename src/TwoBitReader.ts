@@ -5,10 +5,14 @@ const TWOBIT_MAGIC_HTL = 0x1A412743; // BigWig Magic High to Low
 const TWOBIT_MAGIC_LTH = 0x4327411A; // BigWig Magic Low to High
 const TWOBIT_HEADER_SIZE = 16;
 
-const CHARMAPPING: string = "TCAG";
-const CHARARRAY: string[] = [];
-for (let i: number = 0; i <= 256; ++i)
-    CHARARRAY.push(CHARMAPPING[i >> 6] + CHARMAPPING[(i >> 4) & 3] + CHARMAPPING[(i >> 2) & 3] + CHARMAPPING[i & 3]);
+function chararray(): (i: number) => string {
+    const CHARMAPPING: string = "TCAG";
+    const CHARARRAY: string[] = [];
+    for (let i: number = 0; i <= 256; ++i)
+	CHARARRAY.push(CHARMAPPING[i >> 6] + CHARMAPPING[(i >> 4) & 3] + CHARMAPPING[(i >> 2) & 3] + CHARMAPPING[i & 3]);
+    return (i: number): string => CHARARRAY[i];
+};
+const getBases: (twoBit: number) => string = chararray();
 
 /**
  * Represents the header of a two-bit file.
@@ -141,19 +145,22 @@ export async function loadSequenceRecord(dataLoader: DataLoader, header: HeaderD
     
 }
 
-export async function loadSequence(dataLoader: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
+function rn(i: number): string {
+    let retval: string = "";
+    for (let ii: number = 0; ii < i; ++ii)
+	retval += 'N';
+    return retval;
+}
 
+export async function loadSequence(dataLoader: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
+    
     let interruptingNBlocks = [], interruptingMaskBlocks = [];
-    let dataOffset: number = Math.floor(sequence.offset + start / 4);
     let csequence = "";
 
     /* find any interrupting blocks of N's */
     for (let i: number = 0; i < sequence.nBlockStarts.length; ++i) {
 	if (sequence.nBlockStarts[i] > end) break;
-	if (sequence.nBlockStarts[i] + sequence.nBlockSizes[i] < start) {
-	    dataOffset -= sequence.nBlockSizes[i] / 4;
-	    continue;
-	}
+	if (sequence.nBlockStarts[i] + sequence.nBlockSizes[i] < start) continue;
 	interruptingNBlocks.push({
 	    start: sequence.nBlockStarts[i],
 	    size: sequence.nBlockSizes[i]
@@ -161,7 +168,7 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
     }
 
     /* find any interrupting lower-case mask blocks */
-    for (let i: number = 0; i < sequence.nBlockStarts.length; ++i) {
+    for (let i: number = 0; i < sequence.maskBlockStarts.length; ++i) {
 	if (sequence.nBlockStarts[i] > end) break;
 	if (sequence.nBlockStarts[i] + sequence.nBlockSizes[i] < start) continue;
 	interruptingMaskBlocks.push({
@@ -169,35 +176,39 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
 	    size: sequence.maskBlockSizes[i]
 	});
     }
+;
+    let n: number = Math.ceil((end - start) / 4 + Math.ceil((start % 4) / 4));
+    let data: ArrayBuffer = await dataLoader.load(Math.floor(start / 4) + sequence.offset, n);
+    let binaryParser = new BinaryParser(data, header.littleEndian);
+    for (let j: number = 0; j < n; ++j)
+	csequence += getBases(binaryParser.getByte());
+    csequence = csequence.substring(start % 4, start % 4 + end - start);
     
-    /* if it starts with N's, fill those in first */
-    if (interruptingNBlocks.length > 0 && interruptingNBlocks[0].start < start)
-	for (let i: number = start; i < interruptingNBlocks[0].start + interruptingNBlocks[i].size; ++i)
-	    csequence += 'N';
+    /* fill in N's */
+    interruptingNBlocks.forEach((block: { start: number, size: number }, i: number): void => {
+	let blockEnd = block.start + block.size;
+	if (i === 0 && block.start <= start)
+	    csequence = rn((blockEnd <= end ? blockEnd : end) - start) + csequence.substring(
+		(blockEnd < end ? blockEnd : end) - start
+	    );
+	else
+	    csequence = csequence.substring(0, block.start - start) + rn((blockEnd <= end ? blockEnd : end) - block.start) + csequence.substring(
+		(blockEnd < end ? blockEnd : end) - start
+	    );
+    });
 
-    /* read the sequences between any interrupting N blocks */
-    for (let i: number = (interruptingNBlocks.length > 0 && interruptingNBlocks[0].start < start ? 1 : 0); i < interruptingNBlocks.length; ++i) {
-
-	let lastEnd = i === 0 ? start : interruptingNBlocks[i - 1].start + interruptingNBlocks[i - 1].size;
-	let data: ArrayBuffer = await dataLoader.load(dataOffset, (interruptingNBlocks[i].start - lastEnd) / 4);
-	dataOffset += (interruptingNBlocks[i].start - lastEnd) / 4;
-	
-	let binaryParser = new BinaryParser(data, header.littleEndian);
-	for (let j: number = 0; j < (interruptingNBlocks[i].start - lastEnd) / 4; ++j)
-	    csequence += CHARARRAY[binaryParser.getByte()];
-	for (let j: number = 0; j < interruptingNBlocks[i].size && j < end; ++j)
-	    csequence += 'N';
-	
-    }
-
-    /* if it ends with non-N's, read those in last */
-    if (interruptingNBlocks.length === 0 || end > interruptingNBlocks[-1].start + interruptingNBlocks[-1].size) {
-	let lastEnd = interruptingNBlocks.length === 0 ? start : interruptingNBlocks[-1].start + interruptingNBlocks[-1].size;
-	let data: ArrayBuffer = await dataLoader.load(dataOffset, Math.ceil((end - lastEnd) / 4));
-	let binaryParser = new BinaryParser(data, header.littleEndian);
-	for (let j: number = 0; j < (end - lastEnd) / 4; ++j)
-	    csequence += CHARARRAY[binaryParser.getByte()];
-    }
+    /* set lower case */
+    interruptingMaskBlocks.forEach(( block: { start: number, size: number }, i: number): void => {
+	let blockEnd = block.start + block.size;
+	if (i === 0 && block.start <= start)
+	    csequence = csequence.substring(0, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + csequence.substring(
+		(blockEnd < end ? blockEnd : end) - start
+	    );
+	else
+	    csequence = csequence.substring(0, block.start - start) + csequence.substring(block.start - start, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + csequence.substring(
+		(blockEnd < end ? blockEnd : end) - start
+	    );
+    });
 
     return csequence;
     
