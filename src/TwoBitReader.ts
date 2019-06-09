@@ -5,10 +5,10 @@ const TWOBIT_MAGIC_HTL = 0x1A412743; // BigWig Magic High to Low
 const TWOBIT_MAGIC_LTH = 0x4327411A; // BigWig Magic Low to High
 const TWOBIT_HEADER_SIZE = 16;
 
-const charmapping = "TCAG";
-const chararray = [];
-for (let i = 0; i <= 256; ++i)
-    chararray.push(charmapping[i >> 6] + charmapping[(i >> 4) & 3] + charmapping[(i >> 2) & 3] + charmapping[i & 3]);
+const CHARMAPPING: string = "TCAG";
+const CHARARRAY: string[] = [];
+for (let i: number = 0; i <= 256; ++i)
+    CHARARRAY.push(CHARMAPPING[i >> 6] + CHARMAPPING[(i >> 4) & 3] + CHARMAPPING[(i >> 2) & 3] + CHARMAPPING[i & 3]);
 
 /**
  * Represents the header of a two-bit file.
@@ -41,7 +41,7 @@ export interface SequenceRecord {
     maskBlockStarts: number[];
     maskBlockSizes: number[];
     reserved: number;
-    sequenceOffset: number;
+    offset: number;
 };
 
 /**
@@ -114,7 +114,8 @@ export async function loadSequenceRecord(dataLoader: DataLoader, header: HeaderD
 	maskBlockCount: 0,
 	maskBlockStarts: [],
 	maskBlockSizes: [],
-	reserved: 0
+	reserved: 0,
+	offset: 0
     };
 
     data = await dataLoader.load(offset, r.nBlockCount * 8 + 4);
@@ -171,7 +172,7 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
     
     /* if it starts with N's, fill those in first */
     if (interruptingNBlocks.length > 0 && interruptingNBlocks[0].start < start)
-	for (let i: number = start; i < interruptingNBlocks[0].end; ++i)
+	for (let i: number = start; i < interruptingNBlocks[0].start + interruptingNBlocks[i].size; ++i)
 	    csequence += 'N';
 
     /* read the sequences between any interrupting N blocks */
@@ -183,7 +184,7 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
 	
 	let binaryParser = new BinaryParser(data, header.littleEndian);
 	for (let j: number = 0; j < (interruptingNBlocks[i].start - lastEnd) / 4; ++j)
-	    csequence += chararray[binaryParser.getByte()];
+	    csequence += CHARARRAY[binaryParser.getByte()];
 	for (let j: number = 0; j < interruptingNBlocks[i].size && j < end; ++j)
 	    csequence += 'N';
 	
@@ -195,7 +196,7 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
 	let data: ArrayBuffer = await dataLoader.load(dataOffset, Math.ceil((end - lastEnd) / 4));
 	let binaryParser = new BinaryParser(data, header.littleEndian);
 	for (let j: number = 0; j < (end - lastEnd) / 4; ++j)
-	    csequence += chararray[binaryParser.getByte()];
+	    csequence += CHARARRAY[binaryParser.getByte()];
     }
 
     return csequence;
