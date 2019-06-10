@@ -12,6 +12,12 @@ function chararray(): (i: number) => string {
 	CHARARRAY.push(CHARMAPPING[i >> 6] + CHARMAPPING[(i >> 4) & 3] + CHARMAPPING[(i >> 2) & 3] + CHARMAPPING[i & 3]);
     return (i: number): string => CHARARRAY[i];
 };
+
+/**
+ * Decodes a byte to a sequence of bases.
+ *
+ * @param twoBit: the two-bit encoded sequence of four bases to decode.
+ */
 const getBases: (twoBit: number) => string = chararray();
 
 /**
@@ -101,6 +107,13 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
     
 }
 
+/**
+ * Loads a sequence record from a two-bit file.
+ *
+ * @param dataLoader class which handles reading ranges from the file, via HTTP, FTP, etc.
+ * @param header the header data, read by loadHeaderData.
+ * @param sequence the name of the chromosome or sequence from which to read.
+ */
 export async function loadSequenceRecord(dataLoader: DataLoader, header: HeaderData, sequence: string): Promise<SequenceRecord> {
 
     if (header.sequences[sequence] === undefined)
@@ -145,6 +158,11 @@ export async function loadSequenceRecord(dataLoader: DataLoader, header: HeaderD
     
 }
 
+/**
+ * Produces a sequence of repeating N's.
+ *
+ * @param i the number of N's.
+ */
 function rn(i: number): string {
     let retval: string = "";
     for (let ii: number = 0; ii < i; ++ii)
@@ -152,6 +170,15 @@ function rn(i: number): string {
     return retval;
 }
 
+/**
+ * Loads sequence data from a two-bit file.
+ *
+ * @param dataLoader class which handles reading ranges from the file, via HTTP, FTP, etc.
+ * @param header the header data, read by loadHeaderData.
+ * @param sequence the sequence record for the chromosome to read from.
+ * @param start the start position on the chromsome, 0-based and inclusive.
+ * @param end the end position on the chromosome, 0-based and not inclusive.
+ */ 
 export async function loadSequence(dataLoader: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
     
     let interruptingNBlocks = [], interruptingMaskBlocks = [];
@@ -176,7 +203,7 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
 	    size: sequence.maskBlockSizes[i]
 	});
     }
-;
+
     let n: number = Math.ceil((end - start) / 4 + Math.ceil((start % 4) / 4));
     let data: ArrayBuffer = await dataLoader.load(Math.floor(start / 4) + sequence.offset, n);
     let binaryParser = new BinaryParser(data, header.littleEndian);
@@ -213,3 +240,47 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
     return csequence;
     
 }
+
+/**
+ * Main class for dealing with reading TwoBit files.
+ */
+export class TwoBitReader {
+
+    private cachedHeader?: HeaderData;
+    private cachedSequenceRecords: { [name: string]: SequenceRecord } = {};
+
+    /**
+     * @param dataLoader Provided class that deals with fetching data from the file via http, local file, ftp, etc...
+     */
+    constructor(private dataLoader: DataLoader) { }
+
+    /**
+     * Method for getting all header data for dataLoader's file. Data is loaded on demand and cached for subsequent requests.
+     */
+    async getHeader(): Promise<HeaderData> {
+        if (!this.cachedHeader)
+            this.cachedHeader = await loadHeaderData(this.dataLoader);
+        return this.cachedHeader;
+    }
+
+    async getSequenceRecord(chrom: string): Promise<SequenceRecord> {
+	let header: HeaderData = await this.getHeader();
+	if (!this.cachedSequenceRecords[chrom])
+	    this.cachedSequenceRecords[chrom] = await loadSequenceRecord(this.dataLoader, header, chrom);
+	return this.cachedSequenceRecords[chrom];
+    }
+
+    /**
+     * Method for reading sequence data from a single chromosome within a two bit file.
+     *
+     * @param chrom the chromosome from which to read the data.
+     * @param startBase the starting base position for the sequence to read.
+     * @param endBase this ending base position for the sequence to read.
+     */
+    async readTwoBitData(chrom: string, startBase: number, endBase: number): Promise<string> {
+	let sequence: SequenceRecord = await this.getSequenceRecord(chrom);
+        return loadSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase);
+    }
+
+};
+export default TwoBitReader;
