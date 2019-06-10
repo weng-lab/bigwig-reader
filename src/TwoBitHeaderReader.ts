@@ -1,8 +1,7 @@
 import { DataLoader } from "./DataLoader";
 import { BinaryParser } from "./BinaryParser";
+import { HeaderData, FileType } from "./BigWigHeaderReader";
 
-const TWOBIT_MAGIC_HTL = 0x1A412743; // BigWig Magic High to Low
-const TWOBIT_MAGIC_LTH = 0x4327411A; // BigWig Magic Low to High
 const TWOBIT_HEADER_SIZE = 16;
 
 function chararray(): (i: number) => string {
@@ -19,16 +18,6 @@ function chararray(): (i: number) => string {
  * @param twoBit: the two-bit encoded sequence of four bases to decode.
  */
 const getBases: (twoBit: number) => string = chararray();
-
-/**
- * Represents the header of a two-bit file.
- *
- * @prop sequences map of sequence names to offsets within the Two-Bit file.
- */
-export interface HeaderData {
-    littleEndian: boolean;
-    sequences: { [name: string]: number };
-};
 
 /**
  * Contains the full sequence data for one reference sequence within the file.
@@ -59,22 +48,14 @@ export interface SequenceRecord {
  * 
  * @param dataLoader Provided class that deals with fetching data from the file via http, local file, ftp, etc...
  */
-export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData> {
+export async function loadTwoBitHeaderData(dataLoader: DataLoader, littleEndian: boolean): Promise<HeaderData> {
     
     // Load common headers
     const headerData: ArrayBuffer = await dataLoader.load(0, TWOBIT_HEADER_SIZE);
 
     // Determine Endianness
-    let littleEndian = true;
     let binaryParser = new BinaryParser(headerData, littleEndian);
     let magic = binaryParser.getUInt();
-    if (TWOBIT_MAGIC_LTH === magic) {
-        littleEndian = false;
-        binaryParser = new BinaryParser(headerData, littleEndian);
-        magic = binaryParser.getUInt();
-        if (TWOBIT_MAGIC_HTL === magic)
-	    throw new Error("Unable to determine file type: invalid magic number.");
-    }
 
     // read the rest of the header
     let version = binaryParser.getUInt();
@@ -84,7 +65,8 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
 	throw new Error("Unable to determine file type: invalid version or reserved header byte.")
     let header: HeaderData = {
 	sequences: {},
-	littleEndian: littleEndian
+	littleEndian: littleEndian,
+	fileType: FileType.TwoBit
     };
 
     // Load sequence index
@@ -98,7 +80,7 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
 
 	xdata = await dataLoader.load(offset, size + 4);
 	binaryParser = new BinaryParser(xdata, littleEndian);
-	header.sequences[binaryParser.getString(size)] = binaryParser.getUInt();
+	header.sequences![binaryParser.getString(size)] = binaryParser.getUInt();
 	offset += size + 4;
 	
     }
@@ -116,12 +98,12 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
  */
 export async function loadSequenceRecord(dataLoader: DataLoader, header: HeaderData, sequence: string): Promise<SequenceRecord> {
 
-    if (header.sequences[sequence] === undefined)
+    if (header.sequences![sequence] === undefined)
 	throw new Error("sequence " + sequence + " is not present in the file.")
     
-    let data: ArrayBuffer = await dataLoader.load(header.sequences[sequence], 8);
+    let data: ArrayBuffer = await dataLoader.load(header.sequences![sequence], 8);
     let binaryParser = new BinaryParser(data, header.littleEndian);
-    let offset = header.sequences[sequence] + 8;
+    let offset = header.sequences![sequence] + 8;
 
     let r: SequenceRecord = {
 	dnaSize: binaryParser.getUInt(),
@@ -240,47 +222,3 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
     return csequence;
     
 }
-
-/**
- * Main class for dealing with reading TwoBit files.
- */
-export class TwoBitReader {
-
-    private cachedHeader?: HeaderData;
-    private cachedSequenceRecords: { [name: string]: SequenceRecord } = {};
-
-    /**
-     * @param dataLoader Provided class that deals with fetching data from the file via http, local file, ftp, etc...
-     */
-    constructor(private dataLoader: DataLoader) { }
-
-    /**
-     * Method for getting all header data for dataLoader's file. Data is loaded on demand and cached for subsequent requests.
-     */
-    async getHeader(): Promise<HeaderData> {
-        if (!this.cachedHeader)
-            this.cachedHeader = await loadHeaderData(this.dataLoader);
-        return this.cachedHeader;
-    }
-
-    async getSequenceRecord(chrom: string): Promise<SequenceRecord> {
-	let header: HeaderData = await this.getHeader();
-	if (!this.cachedSequenceRecords[chrom])
-	    this.cachedSequenceRecords[chrom] = await loadSequenceRecord(this.dataLoader, header, chrom);
-	return this.cachedSequenceRecords[chrom];
-    }
-
-    /**
-     * Method for reading sequence data from a single chromosome within a two bit file.
-     *
-     * @param chrom the chromosome from which to read the data.
-     * @param startBase the starting base position for the sequence to read.
-     * @param endBase this ending base position for the sequence to read.
-     */
-    async readTwoBitData(chrom: string, startBase: number, endBase: number): Promise<string> {
-	let sequence: SequenceRecord = await this.getSequenceRecord(chrom);
-        return loadSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase);
-    }
-
-};
-export default TwoBitReader;

@@ -1,6 +1,6 @@
 import Axios from "axios";
 import { AxiosDataLoader } from "../src/DataLoader";
-import TwoBitReader from "../src/TwoBitReader";
+import { BigWigReader } from "../src/BigWigReader";
 
 const testTwoBitFilename = "test.2bit";
 
@@ -8,8 +8,9 @@ describe("TwoBitReader", () => {
     
     it("should get header", async () => {
         const loader = new AxiosDataLoader(`http://localhost:8001/${testTwoBitFilename}`, Axios.create());
-	const reader = new TwoBitReader(loader);
+	const reader = new BigWigReader(loader);
         const header = await reader.getHeader();
+	expect(header.fileType).toEqual("TwoBit");
 	expect(header.sequences).toEqual({
 	    "seq1": 34,
 	    "seq2": 100
@@ -18,7 +19,7 @@ describe("TwoBitReader", () => {
 
     it("should get a sequence record for seq1", async () => {
         const loader = new AxiosDataLoader(`http://localhost:8001/${testTwoBitFilename}`, Axios.create());
-	const reader = new TwoBitReader(loader);
+	const reader = new BigWigReader(loader);
 	const seqrecord = await reader.getSequenceRecord("seq1");
 	expect(seqrecord).toEqual({
 	    dnaSize: 165,
@@ -35,7 +36,7 @@ describe("TwoBitReader", () => {
 
     it("should read some sequence from seq1", async () => {
 	const loader = new AxiosDataLoader(`http://localhost:8001/${testTwoBitFilename}`, Axios.create());
-	const reader = new TwoBitReader(loader);
+	const reader = new BigWigReader(loader);
 	expect(await reader.readTwoBitData("seq1", 1, 10)).toEqual("CTGATGCTA");
 	expect(await reader.readTwoBitData("seq1", 44, 48)).toEqual("NNNN");
 	expect(await reader.readTwoBitData("seq1", 43, 47)).toEqual("ANNN");
@@ -45,7 +46,7 @@ describe("TwoBitReader", () => {
 
     it("should read some sequence from seq2", async () => {
 	const loader = new AxiosDataLoader(`http://localhost:8001/${testTwoBitFilename}`, Axios.create());
-	const reader = new TwoBitReader(loader);
+	const reader = new BigWigReader(loader);
 	expect(await reader.readTwoBitData("seq2", 0, 11)).toEqual("actgtgatcga");
 	expect(await reader.readTwoBitData("seq2", 20, 22)).toEqual("tG");
 	expect(await reader.readTwoBitData("seq2", 76, 78)).toEqual("Gg");

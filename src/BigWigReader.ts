@@ -1,6 +1,7 @@
 import { DataLoader, BufferedDataLoader } from "./DataLoader";
 import { BinaryParser } from "./BinaryParser";
-import { loadHeaderData, HeaderData } from "./BigWigHeaderReader";
+import { loadHeaderData, HeaderData, FileType } from "./BigWigHeaderReader";
+import { loadSequenceRecord, loadSequence, SequenceRecord } from "./TwoBitHeaderReader";
 import { inflate } from "pako"
 
 export interface BigWigData {
@@ -60,6 +61,7 @@ const DEFAULT_BUFFER_SIZE = 512000;
 export class BigWigReader {
 
     private cachedHeader?: HeaderData;
+    private cachedSequenceRecords: { [name: string]: SequenceRecord } = {};
 
     /**
      * @param dataLoader Provided class that deals with fetching data from the file via http, local file, ftp, etc...
@@ -80,6 +82,19 @@ export class BigWigReader {
     }
 
     /**
+     * Method for getting a sequence record from a 2bit sequence file. This method is not valid for bigWig or bigBed files.
+     *
+     * @param chrom the name of the chromosome or other sequence to retrieve.
+     */
+    async getSequenceRecord(chrom: string): Promise<SequenceRecord> {
+	let header: HeaderData = await this.getHeader();
+	if (header.fileType !== FileType.TwoBit) throw new Error("getSequenceRecord is not valid on " + header.fileType + " files.");
+	if (!this.cachedSequenceRecords[chrom])
+	    this.cachedSequenceRecords[chrom] = await loadSequenceRecord(this.dataLoader, header, chrom);
+	return this.cachedSequenceRecords[chrom];
+    }
+    
+    /**
      * Method for reading unzoomed wig data from BigWig files.
      * 
      * @param startChrom Starting chromosome
@@ -89,7 +104,7 @@ export class BigWigReader {
      * @param zoomLevelIndex The ZoomLevelHeader.index from the zoom level you want to read from. 
      */
     async readBigWigData(startChrom: string, startBase: number, endChrom: string, endBase: number): Promise<Array<BigWigData>> {
-        return this.readData<BigWigData>(startChrom, startBase, endChrom, endBase, (await this.getHeader()).common.fullIndexOffset, decodeWigData);
+        return this.readData<BigWigData>(startChrom, startBase, endChrom, endBase, (await this.getHeader()).common!.fullIndexOffset, decodeWigData);
     }
 
     /**
@@ -101,7 +116,19 @@ export class BigWigReader {
      * @param endBase Ending base pair
      */
     async readBigBedData(startChrom: string, startBase: number, endChrom: string, endBase: number): Promise<Array<BigBedData>> {
-        return this.readData<BigBedData>(startChrom, startBase, endChrom, endBase, (await this.getHeader()).common.fullIndexOffset, decodeBedData);
+        return this.readData<BigBedData>(startChrom, startBase, endChrom, endBase, (await this.getHeader()).common!.fullIndexOffset, decodeBedData);
+    }
+
+    /**
+     * Method for reading Two Bit sequence data from TwoBit files.
+     *
+     * @param chrom the chromosome from which to read.
+     * @param startBase the starting base.
+     * @param endBase the ending base.
+     */
+    async readTwoBitData(chrom: string, startBase: number, endBase: number): Promise<string> {
+	let sequence: SequenceRecord = await this.getSequenceRecord(chrom);
+        return loadSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase);
     }
 
     /**
@@ -133,7 +160,7 @@ export class BigWigReader {
      * @param decodeFunction 
      */
     private async readData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, treeOffset: number,
-            decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
+			      decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
         const header = await this.getHeader();
         if (undefined == header.chromTree) {
             throw Error("No chromosome tree found in file header.");
@@ -161,7 +188,7 @@ export class BigWigReader {
         const decodedData: Array<T> = [];
         for (const leafNode of leafNodes) {
             let leafData = new Uint8Array(await bufferedLoader.load(leafNode.dataOffset, leafNode.dataSize));
-            if (header.common.uncompressBuffSize > 0) {
+            if (header.common!.uncompressBuffSize > 0) {
                 leafData = inflate(leafData);
             }
             let leafDecodedData = decodeFunction(leafData.buffer as ArrayBuffer, startChromIndex, startBase, endChromIndex, 

@@ -1,6 +1,9 @@
 import { DataLoader } from "./DataLoader";
 import { BinaryParser } from "./BinaryParser";
+import { loadTwoBitHeaderData, SequenceRecord } from "./TwoBitHeaderReader";
 
+const TWOBIT_MAGIC_LTH = 0x1A412743; // BigWig Magic High to Low
+const TWOBIT_MAGIC_HTL = 0x4327411A; // BigWig Magic Low to High
 const BIGWIG_MAGIC_LTH = 0x888FFC26; // BigWig Magic Low to High
 const BIGWIG_MAGIC_HTL = 0x26FC8F88; // BigWig Magic High to Low
 const BIGBED_MAGIC_LTH = 0x8789F2EB; // BigBed Magic Low to High
@@ -14,16 +17,18 @@ const BBFILE_HEADER_SIZE = 64;
 export interface HeaderData {
     fileType: FileType;
     littleEndian: boolean;
-    common: CommonHeader;
+    common?: CommonHeader;
     zoomLevelHeaders?: Array<ZoomLevelHeader>;
     autosql?: string;
     totalSummary?: BWTotalSummary;
     chromTree?: ChromTree;
+    sequences?: { [name: string]: number };
 }
 
 export enum FileType {
     BigWig = "BigWig", 
-    BigBed = "BigBed"
+    BigBed = "BigBed",
+    TwoBit = "TwoBit"
 }
 
 /**
@@ -81,6 +86,7 @@ export interface ChromTree {
  * @param dataLoader Provided class that deals with fetching data from the file via http, local file, ftp, etc...
  */
 export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData> {
+    
     // Load common headers
     const headerData: ArrayBuffer = await dataLoader.load(0, BBFILE_HEADER_SIZE);
 
@@ -93,6 +99,8 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
         fileType = FileType.BigWig;
     } else if (BIGBED_MAGIC_LTH === magic) {
         fileType = FileType.BigBed;
+    } else if (TWOBIT_MAGIC_LTH === magic) {
+	return loadTwoBitHeaderData(dataLoader, littleEndian);
     } else {
         // Try high-to-low
         littleEndian = false;
@@ -102,7 +110,9 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
             fileType = FileType.BigWig;
         } else if (BIGBED_MAGIC_HTL === magic) {
             fileType = FileType.BigBed;
-        }
+        } else if (TWOBIT_MAGIC_HTL === magic) {
+	    return loadTwoBitHeaderData(dataLoader, littleEndian);
+	}
     }
 
     // Don't bother with the rest if we haven't figured out the file type.
