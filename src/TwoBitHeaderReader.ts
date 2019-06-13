@@ -1,7 +1,9 @@
-import { DataLoader } from "./DataLoader";
+import { DataLoader, BufferedDataLoader } from "./DataLoader";
 import { BinaryParser } from "./BinaryParser";
 import { HeaderData, FileType } from "./BigWigHeaderReader";
 
+const HEADER_BUFFER_SIZE = 32768;
+const BUFFER_SIZE = 512000;
 const TWOBIT_HEADER_SIZE = 16;
 
 function chararray(): (i: number) => string {
@@ -48,7 +50,9 @@ export interface SequenceRecord {
  * 
  * @param dataLoader Provided class that deals with fetching data from the file via http, local file, ftp, etc...
  */
-export async function loadTwoBitHeaderData(dataLoader: DataLoader, littleEndian: boolean): Promise<HeaderData> {
+export async function loadTwoBitHeaderData(dataLoaderR: DataLoader, littleEndian: boolean): Promise<HeaderData> {
+    
+    let dataLoader: BufferedDataLoader = new BufferedDataLoader(dataLoaderR, HEADER_BUFFER_SIZE);
     
     // Load common headers
     const headerData: ArrayBuffer = await dataLoader.load(0, TWOBIT_HEADER_SIZE);
@@ -96,8 +100,10 @@ export async function loadTwoBitHeaderData(dataLoader: DataLoader, littleEndian:
  * @param header the header data, read by loadHeaderData.
  * @param sequence the name of the chromosome or sequence from which to read.
  */
-export async function loadSequenceRecord(dataLoader: DataLoader, header: HeaderData, sequence: string): Promise<SequenceRecord> {
+export async function loadSequenceRecord(dataLoaderR: DataLoader, header: HeaderData, sequence: string): Promise<SequenceRecord> {
 
+    let dataLoader: BufferedDataLoader = new BufferedDataLoader(dataLoaderR, BUFFER_SIZE);
+    
     if (header.sequences![sequence] === undefined)
 	throw new Error("sequence " + sequence + " is not present in the file.")
     
@@ -161,10 +167,12 @@ function rn(i: number): string {
  * @param start the start position on the chromsome, 0-based and inclusive.
  * @param end the end position on the chromosome, 0-based and not inclusive.
  */ 
-export async function loadSequence(dataLoader: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
-    
+export async function loadSequence(dataLoaderR: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
+
+    let dataLoader: BufferedDataLoader = new BufferedDataLoader(dataLoaderR, BUFFER_SIZE);
     let interruptingNBlocks = [], interruptingMaskBlocks = [];
     let csequence = "";
+    start = start - 1 < 0 ? 0 : start - 1;
 
     /* find any interrupting blocks of N's */
     for (let i: number = 0; i < sequence.nBlockStarts.length; ++i) {

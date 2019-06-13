@@ -3,10 +3,12 @@ import { AxiosDataLoader } from "../src/DataLoader";
 import { BigWigReader } from "../src/BigWigReader";
 
 const testTwoBitFilename = "test.2bit";
+const testTwoBitPerformanceFilename = "hg38.2bit";
 
 describe("TwoBitReader", () => {
     
     it("should get header", async () => {
+	
         const loader = new AxiosDataLoader(`http://localhost:8001/${testTwoBitFilename}`, Axios.create());
 	const reader = new BigWigReader(loader);
         const header = await reader.getHeader();
@@ -37,20 +39,20 @@ describe("TwoBitReader", () => {
     it("should read some sequence from seq1", async () => {
 	const loader = new AxiosDataLoader(`http://localhost:8001/${testTwoBitFilename}`, Axios.create());
 	const reader = new BigWigReader(loader);
-	expect(await reader.readTwoBitData("seq1", 1, 10)).toEqual("CTGATGCTA");
-	expect(await reader.readTwoBitData("seq1", 44, 48)).toEqual("NNNN");
-	expect(await reader.readTwoBitData("seq1", 43, 47)).toEqual("ANNN");
-	expect(await reader.readTwoBitData("seq1", 43, 87)).toEqual("ANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNCTA");
-	expect(await reader.readTwoBitData("seq1", 83, 87)).toEqual("NCTA");
+	expect(await reader.readTwoBitData("seq1", 2, 10)).toEqual("CTGATGCTA");
+	expect(await reader.readTwoBitData("seq1", 45, 48)).toEqual("NNNN");
+	expect(await reader.readTwoBitData("seq1", 44, 47)).toEqual("ANNN");
+	expect(await reader.readTwoBitData("seq1", 44, 87)).toEqual("ANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNCTA");
+	expect(await reader.readTwoBitData("seq1", 84, 87)).toEqual("NCTA");
     });
 
     it("should read some sequence from seq2", async () => {
 	const loader = new AxiosDataLoader(`http://localhost:8001/${testTwoBitFilename}`, Axios.create());
 	const reader = new BigWigReader(loader);
-	expect(await reader.readTwoBitData("seq2", 0, 11)).toEqual("actgtgatcga");
-	expect(await reader.readTwoBitData("seq2", 20, 22)).toEqual("tG");
-	expect(await reader.readTwoBitData("seq2", 76, 78)).toEqual("Gg");
-	expect(await reader.readTwoBitData("seq2", 105, 116)).toEqual("gtagccggcga");
+	expect(await reader.readTwoBitData("seq2", 1, 11)).toEqual("actgtgatcga");
+	expect(await reader.readTwoBitData("seq2", 21, 22)).toEqual("tG");
+	expect(await reader.readTwoBitData("seq2", 77, 78)).toEqual("Gg");
+	expect(await reader.readTwoBitData("seq2", 106, 116)).toEqual("gtagccggcga");
     });
 
 });
