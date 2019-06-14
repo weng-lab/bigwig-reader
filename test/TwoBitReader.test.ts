@@ -3,7 +3,6 @@ import { AxiosDataLoader } from "../src/DataLoader";
 import { BigWigReader } from "../src/BigWigReader";
 
 const testTwoBitFilename = "test.2bit";
-const testTwoBitPerformanceFilename = "hg38.2bit";
 
 describe("TwoBitReader", () => {
     

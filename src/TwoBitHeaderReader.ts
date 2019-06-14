@@ -3,7 +3,7 @@ import { BinaryParser } from "./BinaryParser";
 import { HeaderData, FileType } from "./BigWigHeaderReader";
 
 const HEADER_BUFFER_SIZE = 32768;
-const BUFFER_SIZE = 512000;
+const BUFFER_SIZE = 3_000_000;
 const TWOBIT_HEADER_SIZE = 16;
 
 function chararray(): (i: number) => string {
@@ -141,7 +141,7 @@ export async function loadSequenceRecord(dataLoaderR: DataLoader, header: Header
 	r.maskBlockSizes.push(binaryParser.getUInt());
     r.reserved = binaryParser.getUInt();
     r.offset = offset;
-
+    
     return r;
     
 }
@@ -167,9 +167,8 @@ function rn(i: number): string {
  * @param start the start position on the chromsome, 0-based and inclusive.
  * @param end the end position on the chromosome, 0-based and not inclusive.
  */ 
-export async function loadSequence(dataLoaderR: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
+export async function loadSequence(dataLoader: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
 
-    let dataLoader: BufferedDataLoader = new BufferedDataLoader(dataLoaderR, BUFFER_SIZE);
     let interruptingNBlocks = [], interruptingMaskBlocks = [];
     let csequence = "";
     start = start - 1 < 0 ? 0 : start - 1;
