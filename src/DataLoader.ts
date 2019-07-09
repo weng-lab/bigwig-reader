@@ -44,6 +44,19 @@ export class AxiosDataLoader implements DataLoader {
 }
 
 /**
+ * DataLoader for loading binary data from an uploaded file.
+ */
+export class FileDataLoader implements DataLoader {
+
+    constructor(private file: File) {}
+
+    async load(start: number, size?: number): Promise<ArrayBuffer> {
+	return (await new Response(this.file.slice(start, size && start + size))).arrayBuffer();
+    }
+    
+}
+
+/**
  * Error that get's returned when we try to read data from a file that's out of bounds.
  */
 class OutOfRangeError extends Error {
