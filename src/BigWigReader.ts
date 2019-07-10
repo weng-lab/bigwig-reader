@@ -74,7 +74,7 @@ export class BigWigReader {
     /**
      * Gets the type of the underlying file.
      */
-    async fileType(): string {
+    async fileType(): FileType {
 	let header: HeaderData = await this.getHeader();
 	return header.fileType;
     }
