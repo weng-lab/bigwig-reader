@@ -72,6 +72,14 @@ export class BigWigReader {
     constructor(private dataLoader: DataLoader, private bufferSize: number = DEFAULT_BUFFER_SIZE) { }
 
     /**
+     * Gets the type of the underlying file.
+     */
+    async fileType(): string {
+	let header: HeaderData = await this.getHeader();
+	return header.fileType;
+    }
+    
+    /**
      * Method for getting all header data for dataLoader's file. Data is loaded on demand and cached for subsequent requests.
      */
     async getHeader(): Promise<HeaderData> {
