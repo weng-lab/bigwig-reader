@@ -1,4 +1,4 @@
-import { DataLoader, BufferedDataLoader } from "./DataLoader";
+import { DataLoader, BufferedDataLoader, FileFormatError, DataMissingError } from "./DataLoader";
 import { BinaryParser } from "./BinaryParser";
 import { HeaderData, FileType } from "./BigWigHeaderReader";
 
@@ -66,7 +66,7 @@ export async function loadTwoBitHeaderData(dataLoaderR: DataLoader, littleEndian
     let sequenceCount = binaryParser.getUInt();
     let reserved = binaryParser.getUInt();
     if (version !== 0 || reserved !== 0)
-	throw new Error("Unable to determine file type: invalid version or reserved header byte.")
+	throw new FileFormatError("Unable to determine file type: invalid version or reserved header byte.")
     let header: HeaderData = {
 	sequences: {},
 	littleEndian: littleEndian,
@@ -105,7 +105,7 @@ export async function loadSequenceRecord(dataLoaderR: DataLoader, header: Header
     let dataLoader: BufferedDataLoader = new BufferedDataLoader(dataLoaderR, BUFFER_SIZE);
     
     if (header.sequences![sequence] === undefined)
-	throw new Error("sequence " + sequence + " is not present in the file.")
+	throw new DataMissingError(sequence)
     
     let data: ArrayBuffer = await dataLoader.load(header.sequences![sequence], 8);
     let binaryParser = new BinaryParser(data, header.littleEndian);

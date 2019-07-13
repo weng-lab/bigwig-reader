@@ -1,5 +1,12 @@
 import Axios, { AxiosInstance, AxiosResponse } from "axios";
 
+export enum ErrorType {
+    OUT_OF_RANGE = "OUT_OF_RANGE",
+    DATA_MISSING = "DATA_MISSING",
+    IO = "IO",
+    FILE_FORMAT = "FILE_FORMAT"
+};
+
 /**
  * Interface for loading data.
  * The application logic doesn't care if the data comes from a local file, 
@@ -60,8 +67,39 @@ export class FileDataLoader implements DataLoader {
  * Error that get's returned when we try to read data from a file that's out of bounds.
  */
 class OutOfRangeError extends Error {
+    errortype = ErrorType.OUT_OF_RANGE;
     constructor(public resource: string, public start: number, public size?: number){
         super(`Request on ${resource} out of range. Range given: ${start}-${size||''}`);
+    }
+}
+
+/**
+ * Error thrown when we try to read data from a chromosome not present in a given file.
+ */
+export class DataMissingError extends Error {
+    errortype = ErrorType.DATA_MISSING;
+    constructor(public chromosome: string) {
+	super(`Given chromosome ${chromosome} not found in file header chromosome tree`);
+    }
+}
+
+/**
+ * Error thrown when there is an I/O error in the underlying DataReader.
+ */
+class IOError extends Error {
+    errortype = ErrorType.IO;
+    constructor(public message: string) {
+	super(message);
+    }
+}
+
+/**
+ * Error thrown when the remote file is corrupt or an invalid request is made for the given file format.
+ */
+export class FileFormatError extends Error {
+    errortype = ErrorType.FILE_FORMAT;
+    constructor(public message: string) {
+	super(message);
     }
 }
 
@@ -104,7 +142,7 @@ export class BufferedDataLoader {
         }
 
         if (size > data.byteLength) {
-            throw new Error(`Requested ${size} bytes but only got back ${this.buffer.size}`);
+            throw new IOError(`Requested ${size} bytes but only got back ${this.buffer.size}`);
         }
         return this.buffer.data.slice(0, size);
     }

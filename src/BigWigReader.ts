@@ -1,4 +1,4 @@
-import { DataLoader, BufferedDataLoader } from "./DataLoader";
+import { DataLoader, BufferedDataLoader, DataMissingError, FileFormatError } from "./DataLoader";
 import { BinaryParser } from "./BinaryParser";
 import { loadHeaderData, HeaderData, FileType } from "./BigWigHeaderReader";
 import { loadSequenceRecord, loadSequence, SequenceRecord } from "./TwoBitHeaderReader";
@@ -96,7 +96,7 @@ export class BigWigReader {
      */
     async getSequenceRecord(chrom: string): Promise<SequenceRecord> {
 	let header: HeaderData = await this.getHeader();
-	if (header.fileType !== FileType.TwoBit) throw new Error("getSequenceRecord is not valid on " + header.fileType + " files.");
+	if (header.fileType !== FileType.TwoBit) throw new FileFormatError("getSequenceRecord is not valid on " + header.fileType + " files.");
 	if (!this.cachedSequenceRecords[chrom])
 	    this.cachedSequenceRecords[chrom] = await loadSequenceRecord(this.dataLoader, header, chrom);
 	return this.cachedSequenceRecords[chrom];
@@ -151,7 +151,7 @@ export class BigWigReader {
     async readZoomData(startChrom: string, startBase: number, endChrom: string, endBase: number, zoomLevelIndex: number): Promise<Array<BigZoomData>> {
         const header = await this.getHeader();
         if (undefined == header.zoomLevelHeaders || !(zoomLevelIndex in header.zoomLevelHeaders)) {
-            throw Error("Given zoomLevelIndex not found in zoom level headers.");
+            throw new FileFormatError("Given zoomLevelIndex not found in zoom level headers.");
         }
         const treeOffset = header.zoomLevelHeaders[zoomLevelIndex].indexOffset;
         return this.readData<BigZoomData>(startChrom, startBase, endChrom, endBase, treeOffset, decodeZoomData);
@@ -171,22 +171,22 @@ export class BigWigReader {
 			      decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
         const header = await this.getHeader();
         if (undefined == header.chromTree) {
-            throw Error("No chromosome tree found in file header.");
+            throw new FileFormatError("No chromosome tree found in file header.");
         }
         const startChromIndex: number = header.chromTree.chromToId[startChrom];
         const endChromIndex: number = header.chromTree.chromToId[endChrom];
         if (undefined == startChromIndex) {
-            throw Error(`Given chromosome ${startChrom} not found in file header chromosome tree.`);
+            throw new DataMissingError(startChrom);
         }
         if (undefined == endChromIndex) {
-            throw Error(`Given chromosome ${endChrom} not found in file header chromosome tree.`);
+            throw new DataMissingError(endChrom);
         }
 
         // Load all leaf nodes within given chr / base bounds for the R+ tree used for actually storing the data.
         const bufferedLoader = new BufferedDataLoader(this.dataLoader, DEFAULT_BUFFER_SIZE);
         const magic = new BinaryParser(await bufferedLoader.load(treeOffset, RPTREE_HEADER_SIZE)).getUInt();
         if (IDX_MAGIC !== magic) {
-            throw new Error(`R+ tree not found at offset ${treeOffset}`);
+            throw new FileFormatError(`R+ tree not found at offset ${treeOffset}`);
         }
         const rootNodeOffset = treeOffset + RPTREE_HEADER_SIZE;
         const leafNodes: Array<RPLeafNode> = await loadLeafNodesForRPNode(bufferedLoader, header.littleEndian, rootNodeOffset, 
