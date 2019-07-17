@@ -20,6 +20,7 @@
     "typescript": "^3.0.1"
   },
   "dependencies": {
+    "@google-cloud/storage": "^3.0.3",
     "axios": "^0.18.0",
     "pako": "^1.0.6"
   },
