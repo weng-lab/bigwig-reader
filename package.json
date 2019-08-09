@@ -14,7 +14,7 @@
   "devDependencies": {
     "@types/jest": "^23.3.1",
     "@types/node": "^10.9.4",
-    "@types/pako": "^1.0.0",
+    "@types/pako": "^1.0.1",
     "jest": "^23.5.0",
     "ts-jest": "^23.1.4",
     "typescript": "^3.0.1"
@@ -22,7 +22,7 @@
   "dependencies": {
     "@google-cloud/storage": "^3.0.3",
     "axios": "^0.18.0",
-    "pako": "^1.0.6"
+    "pako": "^1.0.10"
   },
   "scripts": {
     "build": "tsc",

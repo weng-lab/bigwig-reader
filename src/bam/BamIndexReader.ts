@@ -18,19 +18,33 @@ export interface BinIndex {
     [binNumber: string]: Array<Chunk>
 }
 
+export interface BamIndexRefData {
+    binIndex: BinIndex, 
+    linearIndex: Array<VirtualOffset>
+}
+
 // Top Level Representation of Parsed Index
-export interface BamIndex {
-    [refId: string]: { binIndex: BinIndex, linearIndex: Array<VirtualOffset> }
+export interface BamIndexData {
+    firstAlignmentBlock: number;
+    // array of index data per reference id, where reference id is array index.
+    refData: Array<BamIndexRefData>
 }
 
 const BAI_MAGIC = 21578050;
 const PSEUDO_BIN_MAGIC = 37450;
 
-export async function blocksForRange(bamIndex: BamIndex, refId: number, 
+/**
+ * 
+ * @param bamIndexRefData 
+ * @param refId 
+ * @param start 
+ * @param end 
+ */
+export async function blocksForRange(indexData: BamIndexData, refId: number, 
         start: number, end: number): Promise<Array<Chunk>> {
     const overlappingBins: Array<number> = reg2bins(start, end);
-    const binIndex: BinIndex = bamIndex[refId].binIndex;
-    const linearIndex: Array<VirtualOffset> = bamIndex[refId].linearIndex;
+    const binIndex: BinIndex = indexData.refData[refId].binIndex;
+    const linearIndex: Array<VirtualOffset> = indexData.refData[refId].linearIndex;
     
     // Get all chunks for overlapping bins.
     let allChunks: Array<Chunk> = [];
@@ -75,7 +89,9 @@ function optimizeChunks(chunks: Array<Chunk>, lowest?: VirtualOffset): Array<Chu
 
     let currentMergedChunk: Chunk | undefined = undefined;
     for (let chunk of chunks) {
-        if (lowest !== undefined && isVOLessThan(chunk.end, lowest)) continue;
+        if (lowest !== undefined && isVOLessThan(chunk.end, lowest)){
+            continue;
+        }
         if (currentMergedChunk === undefined) {
             currentMergedChunk = chunk;
             mergedChunks.push(currentMergedChunk);
@@ -95,18 +111,7 @@ function optimizeChunks(chunks: Array<Chunk>, lowest?: VirtualOffset): Array<Chu
     return mergedChunks;
 }
 
-export function readFullIndex(indexDataLoader: DataLoader): Promise<BamIndex> {
-    return readBamIndex(indexDataLoader);
-}
-
-export function readPartialBamIndex(indexDataLoader: DataLoader, refId: number, 
-        start: number, end: number): Promise<BamIndex> {
-    const overlappingBins: Array<number> = reg2bins(start, end);
-    return readBamIndex(indexDataLoader, [refId], overlappingBins);
-}
-
-async function readBamIndex(indexDataLoader: DataLoader, refIdFilter?: Array<number>,
-        binFilter?: Array<number>): Promise<BamIndex> {
+export async function readBamIndex(indexDataLoader: DataLoader): Promise<BamIndexData> {
     const indexData: ArrayBuffer = await indexDataLoader.load(0);
     const parser = new BinaryParser(indexData);
     const magic = parser.getInt();
@@ -114,7 +119,8 @@ async function readBamIndex(indexDataLoader: DataLoader, refIdFilter?: Array<num
         throw new Error('Not a BAI file');
     }
 
-    const bamIndex: BamIndex = {};
+    let firstAlignmentBlock: number | undefined = undefined;
+    const refData: Array<BamIndexRefData> = [];
 
     // Number of reference sequences
     const numRefs = parser.getInt();
@@ -129,7 +135,7 @@ async function readBamIndex(indexDataLoader: DataLoader, refIdFilter?: Array<num
             // We don't care about the metadata in pseudo-bins, so just skip in parser.
             if (binNumber == PSEUDO_BIN_MAGIC) {
                 // increment by space for 1 int and 4 ulongs. 4 + 8 * 4 = 36.
-                parser.position += 36
+                parser.position += 36;
                 continue;
             }
 
@@ -139,11 +145,12 @@ async function readBamIndex(indexDataLoader: DataLoader, refIdFilter?: Array<num
                 const chunkStart = readVirtualOffset(parser);
                 const chunkEnd = readVirtualOffset(parser);
                 binChunks.push({ start: chunkStart, end: chunkEnd });
+                if (firstAlignmentBlock === undefined || firstAlignmentBlock < chunkStart.blockPosition) {
+                    firstAlignmentBlock = chunkStart.blockPosition;
+                }
             }
 
-            if (binFilter === undefined || binFilter.includes(bin)) {
-                binIndex[binNumber] = binChunks;
-            }
+            binIndex[binNumber] = binChunks;
         }
 
         // Add to linear index
@@ -152,11 +159,9 @@ async function readBamIndex(indexDataLoader: DataLoader, refIdFilter?: Array<num
             linearIndex.push(readVirtualOffset(parser));
         }
         
-        if (refIdFilter === undefined || refIdFilter.includes(ref)) {
-            bamIndex[ref] = { binIndex, linearIndex };
-        }
+        refData.push({ binIndex, linearIndex });
     }
-    return bamIndex;
+    return { firstAlignmentBlock: firstAlignmentBlock as number, refData };
 }
 
 function readVirtualOffset(parser: BinaryParser): VirtualOffset {

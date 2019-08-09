@@ -1,31 +1,35 @@
 import { DataLoader, BufferedDataLoader } from "../DataLoader";
 import { BinaryParser } from "../BinaryParser";
+import { bgzfUnzip } from "./Bgzf";
 
 export interface BamHeader {
     text: string,
-    chromToId: { [chrom: string]: number }
+    chromToId: { [chrom: string]: number },
+    idToChrom: Array<string>;
 }
 
-const BAM_MAGIC = 21840194;
-const BUFFER_SIZE = 128000;
+const MAX_GZIP_BLOCK_SIZE = 65536;
+const BAM_MAGIC = 0x014d4142;
 
-export async function readBamHeaderData(bamDataLoader: DataLoader): Promise<BamHeader> {
-    const bufferedLoader = new BufferedDataLoader(bamDataLoader, BUFFER_SIZE);
-    const magic = new BinaryParser(await bufferedLoader.load(0, 4)).getInt();
+export async function readBamHeaderData(bamDataLoader: DataLoader, firstAlignmentBlock: number): Promise<BamHeader> {
+    const headerData: ArrayBuffer = await bamDataLoader.load(0, firstAlignmentBlock + MAX_GZIP_BLOCK_SIZE);
+    const unzippedHeaderData = bgzfUnzip(headerData);
+    const parser = new BinaryParser(unzippedHeaderData);
+    const magic = parser.getUInt();
     if (magic !== BAM_MAGIC) throw Error("Invalid Bam File!");
-    const textLen = new BinaryParser(await bufferedLoader.load(4, 4)).getInt();
-    const headerText = new BinaryParser(await bufferedLoader.load(8, textLen)).getString(textLen);
-    let currentPos = 8 + textLen;
-    const numRefs = new BinaryParser(await bufferedLoader.load(currentPos, 4)).getInt();
-    currentPos += 4;
+    const textLen = parser.getInt();
+    const headerText = parser.getString(textLen);
+    const numRefs = parser.getInt();
     const chromToId: { [chrom: string]: number } = {};
+    const idToChrom: Array<string> = [];
     for (let refId = 0; refId < numRefs; refId++) {
-        const nameLen = new BinaryParser(await bufferedLoader.load(currentPos, 4)).getInt();
-        currentPos += 4;
-        const refName = new BinaryParser(await bufferedLoader.load(currentPos, nameLen)).getString(nameLen);
+        const nameLen = parser.getInt();
+        const refName = parser.getString(nameLen);
         // Skip the next field as well, chrom length, since we don't need it.
-        currentPos += nameLen + 4;
+        parser.getInt();
+        
         chromToId[refName] = refId;
+        idToChrom.push(refName);
     }
-    return { text: headerText, chromToId: chromToId };
+    return { text: headerText, chromToId, idToChrom };
 }

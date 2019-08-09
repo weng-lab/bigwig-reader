@@ -2,7 +2,7 @@ import { DataLoader, BufferedDataLoader, DataMissingError, FileFormatError } fro
 import { BinaryParser } from "./BinaryParser";
 import { loadHeaderData, HeaderData, FileType } from "./BigWigHeaderReader";
 import { loadSequenceRecord, loadSequence, SequenceRecord } from "./TwoBitHeaderReader";
-import { inflate } from "pako"
+import { inflate } from "pako";
 
 export interface BigWigData {
     chr: string,
@@ -75,8 +75,8 @@ export class BigWigReader {
      * Gets the type of the underlying file.
      */
     async fileType(): Promise<FileType> {
-	let header: HeaderData = await this.getHeader();
-	return header.fileType;
+	    let header: HeaderData = await this.getHeader();
+	    return header.fileType;
     }
     
     /**
@@ -95,11 +95,12 @@ export class BigWigReader {
      * @param chrom the name of the chromosome or other sequence to retrieve.
      */
     async getSequenceRecord(chrom: string): Promise<SequenceRecord> {
-	let header: HeaderData = await this.getHeader();
-	if (header.fileType !== FileType.TwoBit) throw new FileFormatError("getSequenceRecord is not valid on " + header.fileType + " files.");
-	if (!this.cachedSequenceRecords[chrom])
-	    this.cachedSequenceRecords[chrom] = await loadSequenceRecord(this.dataLoader, header, chrom);
-	return this.cachedSequenceRecords[chrom];
+	    let header: HeaderData = await this.getHeader();
+	    if (header.fileType !== FileType.TwoBit) throw new FileFormatError("getSequenceRecord is not valid on " + header.fileType + " files.");
+	    if (!this.cachedSequenceRecords[chrom]) {
+            this.cachedSequenceRecords[chrom] = await loadSequenceRecord(this.dataLoader, header, chrom);
+        }
+	    return this.cachedSequenceRecords[chrom];
     }
     
     /**
