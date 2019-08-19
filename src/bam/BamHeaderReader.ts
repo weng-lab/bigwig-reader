@@ -1,5 +1,5 @@
-import { DataLoader, BufferedDataLoader } from "../DataLoader";
-import { BinaryParser } from "../BinaryParser";
+import { DataLoader } from "../loader/DataLoader";
+import { BinaryParser } from "../util/BinaryParser";
 import { bgzfUnzip } from "./Bgzf";
 
 export interface BamHeader {

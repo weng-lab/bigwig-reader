@@ -1,5 +1,5 @@
-import { DataLoader, BufferedDataLoader, DataMissingError, FileFormatError } from "./DataLoader";
-import { BinaryParser } from "./BinaryParser";
+import { DataLoader, BufferedDataLoader, DataMissingError, FileFormatError } from "../loader/DataLoader";
+import { BinaryParser } from "../util/BinaryParser";
 import { loadHeaderData, HeaderData, FileType } from "./BigWigHeaderReader";
 import { loadSequenceRecord, loadSequence, SequenceRecord } from "./TwoBitHeaderReader";
 import { inflate } from "pako";

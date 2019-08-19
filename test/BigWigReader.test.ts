@@ -1,7 +1,5 @@
 import Axios from "axios";
-import { AxiosDataLoader } from "../src/DataLoader";
-import { BigWigReader } from "../src/BigWigReader";
-import { HeaderData } from "../src/BigWigHeaderReader";
+import { AxiosDataLoader, BigWigReader, HeaderData } from "../src/";
 
 const testBWFilename = "testbw.bigwig";
 const testBWFixedStepName = "test.fixedstep.bigwig";

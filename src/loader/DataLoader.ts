@@ -1,5 +1,3 @@
-import Axios, { AxiosInstance, AxiosResponse } from "axios";
-
 export enum ErrorType {
     OUT_OF_RANGE = "OUT_OF_RANGE",
     DATA_MISSING = "DATA_MISSING",
@@ -20,53 +18,9 @@ export interface DataLoader {
 }
 
 /**
- * DataLoader for http range requests using Axios library.
- * You can pass in your own request configuration via the axios arg in the constructor.
- */
-export class AxiosDataLoader implements DataLoader {
-
-    private cachedFileSize: number|undefined = undefined;
-
-    constructor(private url: string, private axios: AxiosInstance = Axios.create()) {}
-
-    async load(start: number, size?: number): Promise<ArrayBuffer> {
-        const response: AxiosResponse<ArrayBuffer|Buffer> = await this.axios.get(this.url, { 
-            responseType: 'arraybuffer', 
-            headers: { "Range": `bytes=${start}-${size ? start+size-1 : ""}`}
-        });
-
-        // If we get an out of range response
-        if (416 == response.status) {
-            throw new OutOfRangeError(this.url, start, size);
-        }
-
-        // If this is running on node.js axios will return node.js "Buffer" objects for arraybuffer requests
-        if (response.data instanceof Buffer) {
-            return new Uint8Array(response.data).buffer as ArrayBuffer;
-        } else {
-            return response.data;
-        }
-    }
-
-}
-
-/**
- * DataLoader for loading binary data from an uploaded file.
- */
-export class FileDataLoader implements DataLoader {
-
-    constructor(private file: File) {}
-
-    async load(start: number, size?: number): Promise<ArrayBuffer> {
-	return (await new Response(this.file.slice(start, size && start + size))).arrayBuffer();
-    }
-    
-}
-
-/**
  * Error that get's returned when we try to read data from a file that's out of bounds.
  */
-class OutOfRangeError extends Error {
+export class OutOfRangeError extends Error {
     errortype = ErrorType.OUT_OF_RANGE;
     constructor(public resource: string, public start: number, public size?: number){
         super(`Request on ${resource} out of range. Range given: ${start}-${size||''}`);
@@ -79,17 +33,17 @@ class OutOfRangeError extends Error {
 export class DataMissingError extends Error {
     errortype = ErrorType.DATA_MISSING;
     constructor(public chromosome: string) {
-	super(`Given chromosome ${chromosome} not found in file header chromosome tree`);
+	    super(`Given chromosome ${chromosome} not found in file header chromosome tree`);
     }
 }
 
 /**
  * Error thrown when there is an I/O error in the underlying DataReader.
  */
-class IOError extends Error {
+export class IOError extends Error {
     errortype = ErrorType.IO;
     constructor(public message: string) {
-	super(message);
+	    super(message);
     }
 }
 
@@ -99,9 +53,10 @@ class IOError extends Error {
 export class FileFormatError extends Error {
     errortype = ErrorType.FILE_FORMAT;
     constructor(public message: string) {
-	super(message);
+	    super(message);
     }
 }
+
 
 /**
  * Wrapper for other DataLoaders that buffers. Used internally by the BigWigReader.

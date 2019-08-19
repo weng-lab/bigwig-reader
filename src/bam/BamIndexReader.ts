@@ -1,5 +1,5 @@
-import { DataLoader } from "../DataLoader";
-import { BinaryParser } from "../BinaryParser";
+import { DataLoader } from "../loader/DataLoader";
+import { BinaryParser } from "../util/BinaryParser";
 
 
 export interface VirtualOffset {
@@ -49,7 +49,7 @@ export async function blocksForRange(indexData: BamIndexData, refId: number,
     // Get all chunks for overlapping bins.
     let allChunks: Array<Chunk> = [];
     for (let bin in binIndex) {
-        if (overlappingBins.includes(Number(bin))) continue;
+        if (!overlappingBins.includes(Number(bin))) continue;
         allChunks = allChunks.concat(binIndex[bin]);
     }
 
@@ -57,7 +57,7 @@ export async function blocksForRange(indexData: BamIndexData, refId: number,
     // contain alignments in the region.
     let lowest: VirtualOffset | undefined = undefined;
     const minLin = Math.min(start >> 14, linearIndex.length - 1);
-    const maxLin = Math.max(start >> 14, linearIndex.length - 1);
+    const maxLin = Math.max(end >> 14, linearIndex.length - 1);
     for (let i = minLin; i <= maxLin; i++) {
         let offset: VirtualOffset = linearIndex[i];
         if (offset === undefined) continue;
@@ -184,11 +184,12 @@ function readVirtualOffset(parser: BinaryParser): VirtualOffset {
  */
 function reg2bins(start: number, end: number): Array<number> {
     const list = [0];
+    if (end >= 1 << 29) end = 1 << 29;
     end--;
-    for (let k = 1 + (start >> 26); k <= 1 + (end >> 26); k += 1) list.push(k);
-    for (let k = 9 + (start >> 23); k <= 9 + (end >> 23); k += 1) list.push(k);
-    for (let k = 73 + (start >> 20); k <= 73 + (end >> 20); k += 1) list.push(k);
-    for (let k = 585 + (start >> 17); k <= 585 + (end >> 17); k += 1) list.push(k);
-    for (let k = 4681 + (start >> 14); k <= 4681 + (end >> 14); k += 1) list.push(k);
+    for (let k = 1 + (start >> 26); k <= 1 + (end >> 26); k++) list.push(k);
+    for (let k = 9 + (start >> 23); k <= 9 + (end >> 23); k++) list.push(k);
+    for (let k = 73 + (start >> 20); k <= 73 + (end >> 20); k++) list.push(k);
+    for (let k = 585 + (start >> 17); k <= 585 + (end >> 17); k++) list.push(k);
+    for (let k = 4681 + (start >> 14); k <= 4681 + (end >> 14); k++) list.push(k);
     return list;
 }

@@ -1,5 +1,5 @@
-import { DataLoader } from "./DataLoader";
-import { BinaryParser } from "./BinaryParser";
+import { DataLoader } from "../loader/DataLoader";
+import { BinaryParser } from "../util/BinaryParser";
 import { loadTwoBitHeaderData, SequenceRecord } from "./TwoBitHeaderReader";
 
 const TWOBIT_MAGIC_LTH = 0x1A412743; // BigWig Magic High to Low
@@ -100,7 +100,7 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
     } else if (BIGBED_MAGIC_LTH === magic) {
         fileType = FileType.BigBed;
     } else if (TWOBIT_MAGIC_LTH === magic) {
-	return loadTwoBitHeaderData(dataLoader, littleEndian);
+	    return loadTwoBitHeaderData(dataLoader, littleEndian);
     } else {
         // Try high-to-low
         littleEndian = false;
@@ -111,8 +111,8 @@ export async function loadHeaderData(dataLoader: DataLoader): Promise<HeaderData
         } else if (BIGBED_MAGIC_HTL === magic) {
             fileType = FileType.BigBed;
         } else if (TWOBIT_MAGIC_HTL === magic) {
-	    return loadTwoBitHeaderData(dataLoader, littleEndian);
-	}
+	        return loadTwoBitHeaderData(dataLoader, littleEndian);
+	    }
     }
 
     // Don't bother with the rest if we haven't figured out the file type.

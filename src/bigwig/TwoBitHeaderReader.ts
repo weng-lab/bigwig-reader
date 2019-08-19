@@ -1,5 +1,5 @@
-import { DataLoader, BufferedDataLoader, FileFormatError, DataMissingError } from "./DataLoader";
-import { BinaryParser } from "./BinaryParser";
+import { DataLoader, BufferedDataLoader, FileFormatError, DataMissingError } from "../loader/DataLoader";
+import { BinaryParser } from "../util/BinaryParser";
 import { HeaderData, FileType } from "./BigWigHeaderReader";
 
 const HEADER_BUFFER_SIZE = 32768;
@@ -10,7 +10,7 @@ function chararray(): (i: number) => string {
     const CHARMAPPING: string = "TCAG";
     const CHARARRAY: string[] = [];
     for (let i: number = 0; i <= 256; ++i)
-	CHARARRAY.push(CHARMAPPING[i >> 6] + CHARMAPPING[(i >> 4) & 3] + CHARMAPPING[(i >> 2) & 3] + CHARMAPPING[i & 3]);
+        CHARARRAY.push(CHARMAPPING[i >> 6] + CHARMAPPING[(i >> 4) & 3] + CHARMAPPING[(i >> 2) & 3] + CHARMAPPING[i & 3]);
     return (i: number): string => CHARARRAY[i];
 };
 
@@ -51,9 +51,9 @@ export interface SequenceRecord {
  * @param dataLoader Provided class that deals with fetching data from the file via http, local file, ftp, etc...
  */
 export async function loadTwoBitHeaderData(dataLoaderR: DataLoader, littleEndian: boolean): Promise<HeaderData> {
-    
+
     let dataLoader: BufferedDataLoader = new BufferedDataLoader(dataLoaderR, HEADER_BUFFER_SIZE);
-    
+
     // Load common headers
     const headerData: ArrayBuffer = await dataLoader.load(0, TWOBIT_HEADER_SIZE);
 
@@ -66,31 +66,31 @@ export async function loadTwoBitHeaderData(dataLoaderR: DataLoader, littleEndian
     let sequenceCount = binaryParser.getUInt();
     let reserved = binaryParser.getUInt();
     if (version !== 0 || reserved !== 0)
-	throw new FileFormatError("Unable to determine file type: invalid version or reserved header byte.")
+        throw new FileFormatError("Unable to determine file type: invalid version or reserved header byte.")
     let header: HeaderData = {
-	sequences: {},
-	littleEndian: littleEndian,
-	fileType: FileType.TwoBit
+        sequences: {},
+        littleEndian: littleEndian,
+        fileType: FileType.TwoBit
     };
 
     // Load sequence index
     let offset = TWOBIT_HEADER_SIZE;
     for (let i = 0; i < sequenceCount; ++i) {
-	
-	let xdata: ArrayBuffer = await dataLoader.load(offset, 4);
-	let binaryParser = new BinaryParser(xdata, littleEndian);
-	let size: number = binaryParser.getByte();
-	offset += 1;
 
-	xdata = await dataLoader.load(offset, size + 4);
-	binaryParser = new BinaryParser(xdata, littleEndian);
-	header.sequences![binaryParser.getString(size)] = binaryParser.getUInt();
-	offset += size + 4;
-	
+        let xdata: ArrayBuffer = await dataLoader.load(offset, 4);
+        let binaryParser = new BinaryParser(xdata, littleEndian);
+        let size: number = binaryParser.getByte();
+        offset += 1;
+
+        xdata = await dataLoader.load(offset, size + 4);
+        binaryParser = new BinaryParser(xdata, littleEndian);
+        header.sequences![binaryParser.getString(size)] = binaryParser.getUInt();
+        offset += size + 4;
+
     }
 
     return header;
-    
+
 }
 
 /**
@@ -103,47 +103,47 @@ export async function loadTwoBitHeaderData(dataLoaderR: DataLoader, littleEndian
 export async function loadSequenceRecord(dataLoaderR: DataLoader, header: HeaderData, sequence: string): Promise<SequenceRecord> {
 
     let dataLoader: BufferedDataLoader = new BufferedDataLoader(dataLoaderR, BUFFER_SIZE);
-    
+
     if (header.sequences![sequence] === undefined)
-	throw new DataMissingError(sequence)
-    
+        throw new DataMissingError(sequence)
+
     let data: ArrayBuffer = await dataLoader.load(header.sequences![sequence], 8);
     let binaryParser = new BinaryParser(data, header.littleEndian);
     let offset = header.sequences![sequence] + 8;
 
     let r: SequenceRecord = {
-	dnaSize: binaryParser.getUInt(),
-	nBlockCount: binaryParser.getUInt(),
-	nBlockStarts: [],
-	nBlockSizes: [],
-	maskBlockCount: 0,
-	maskBlockStarts: [],
-	maskBlockSizes: [],
-	reserved: 0,
-	offset: 0
+        dnaSize: binaryParser.getUInt(),
+        nBlockCount: binaryParser.getUInt(),
+        nBlockStarts: [],
+        nBlockSizes: [],
+        maskBlockCount: 0,
+        maskBlockStarts: [],
+        maskBlockSizes: [],
+        reserved: 0,
+        offset: 0
     };
 
     data = await dataLoader.load(offset, r.nBlockCount * 8 + 4);
     offset += r.nBlockCount * 8 + 4;
     binaryParser = new BinaryParser(data, header.littleEndian);
     for (let i = 0; i < r.nBlockCount; ++i)
-	r.nBlockStarts.push(binaryParser.getUInt());
+        r.nBlockStarts.push(binaryParser.getUInt());
     for (let i = 0; i < r.nBlockCount; ++i)
-	r.nBlockSizes.push(binaryParser.getUInt());
+        r.nBlockSizes.push(binaryParser.getUInt());
     r.maskBlockCount = binaryParser.getUInt();
 
     data = await dataLoader.load(offset, r.maskBlockCount * 8 + 4);
     offset += r.maskBlockCount * 8 + 4;
     binaryParser = new BinaryParser(data, header.littleEndian);
     for (let i = 0; i < r.maskBlockCount; ++i)
-	r.maskBlockStarts.push(binaryParser.getUInt());
+        r.maskBlockStarts.push(binaryParser.getUInt());
     for (let i = 0; i < r.maskBlockCount; ++i)
-	r.maskBlockSizes.push(binaryParser.getUInt());
+        r.maskBlockSizes.push(binaryParser.getUInt());
     r.reserved = binaryParser.getUInt();
     r.offset = offset;
-    
+
     return r;
-    
+
 }
 
 /**
@@ -154,7 +154,7 @@ export async function loadSequenceRecord(dataLoaderR: DataLoader, header: Header
 function rn(i: number): string {
     let retval: string = "";
     for (let ii: number = 0; ii < i; ++ii)
-	retval += 'N';
+        retval += 'N';
     return retval;
 }
 
@@ -166,7 +166,7 @@ function rn(i: number): string {
  * @param sequence the sequence record for the chromosome to read from.
  * @param start the start position on the chromsome, 0-based and inclusive.
  * @param end the end position on the chromosome, 0-based and not inclusive.
- */ 
+ */
 export async function loadSequence(dataLoader: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
 
     let interruptingNBlocks = [], interruptingMaskBlocks = [];
@@ -175,57 +175,57 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
 
     /* find any interrupting blocks of N's */
     for (let i: number = 0; i < sequence.nBlockStarts.length; ++i) {
-	if (sequence.nBlockStarts[i] > end) break;
-	if (sequence.nBlockStarts[i] + sequence.nBlockSizes[i] < start) continue;
-	interruptingNBlocks.push({
-	    start: sequence.nBlockStarts[i],
-	    size: sequence.nBlockSizes[i]
-	});
+        if (sequence.nBlockStarts[i] > end) break;
+        if (sequence.nBlockStarts[i] + sequence.nBlockSizes[i] < start) continue;
+        interruptingNBlocks.push({
+            start: sequence.nBlockStarts[i],
+            size: sequence.nBlockSizes[i]
+        });
     }
 
     /* find any interrupting lower-case mask blocks */
     for (let i: number = 0; i < sequence.maskBlockStarts.length; ++i) {
-	if (sequence.nBlockStarts[i] > end) break;
-	if (sequence.nBlockStarts[i] + sequence.nBlockSizes[i] < start) continue;
-	interruptingMaskBlocks.push({
-	    start: sequence.maskBlockStarts[i],
-	    size: sequence.maskBlockSizes[i]
-	});
+        if (sequence.nBlockStarts[i] > end) break;
+        if (sequence.nBlockStarts[i] + sequence.nBlockSizes[i] < start) continue;
+        interruptingMaskBlocks.push({
+            start: sequence.maskBlockStarts[i],
+            size: sequence.maskBlockSizes[i]
+        });
     }
 
     let n: number = Math.ceil((end - start) / 4 + Math.ceil((start % 4) / 4));
     let data: ArrayBuffer = await dataLoader.load(Math.floor(start / 4) + sequence.offset, n);
     let binaryParser = new BinaryParser(data, header.littleEndian);
     for (let j: number = 0; j < n; ++j)
-	csequence += getBases(binaryParser.getByte());
+        csequence += getBases(binaryParser.getByte());
     csequence = csequence.substring(start % 4, start % 4 + end - start);
-    
+
     /* fill in N's */
     interruptingNBlocks.forEach((block: { start: number, size: number }, i: number): void => {
-	let blockEnd = block.start + block.size;
-	if (i === 0 && block.start <= start)
-	    csequence = rn((blockEnd <= end ? blockEnd : end) - start) + csequence.substring(
-		(blockEnd < end ? blockEnd : end) - start
-	    );
-	else
-	    csequence = csequence.substring(0, block.start - start) + rn((blockEnd <= end ? blockEnd : end) - block.start) + csequence.substring(
-		(blockEnd < end ? blockEnd : end) - start
-	    );
+        let blockEnd = block.start + block.size;
+        if (i === 0 && block.start <= start)
+            csequence = rn((blockEnd <= end ? blockEnd : end) - start) + csequence.substring(
+                (blockEnd < end ? blockEnd : end) - start
+            );
+        else
+            csequence = csequence.substring(0, block.start - start) + rn((blockEnd <= end ? blockEnd : end) - block.start) + csequence.substring(
+                (blockEnd < end ? blockEnd : end) - start
+            );
     });
 
     /* set lower case */
-    interruptingMaskBlocks.forEach(( block: { start: number, size: number }, i: number): void => {
-	let blockEnd = block.start + block.size;
-	if (i === 0 && block.start <= start)
-	    csequence = csequence.substring(0, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + csequence.substring(
-		(blockEnd < end ? blockEnd : end) - start
-	    );
-	else
-	    csequence = csequence.substring(0, block.start - start) + csequence.substring(block.start - start, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + csequence.substring(
-		(blockEnd < end ? blockEnd : end) - start
-	    );
+    interruptingMaskBlocks.forEach((block: { start: number, size: number }, i: number): void => {
+        let blockEnd = block.start + block.size;
+        if (i === 0 && block.start <= start)
+            csequence = csequence.substring(0, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + csequence.substring(
+                (blockEnd < end ? blockEnd : end) - start
+            );
+        else
+            csequence = csequence.substring(0, block.start - start) + csequence.substring(block.start - start, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + csequence.substring(
+                (blockEnd < end ? blockEnd : end) - start
+            );
     });
 
     return csequence;
-    
+
 }

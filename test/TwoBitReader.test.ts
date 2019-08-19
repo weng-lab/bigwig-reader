@@ -1,6 +1,5 @@
 import Axios from "axios";
-import { AxiosDataLoader } from "../src/DataLoader";
-import { BigWigReader } from "../src/BigWigReader";
+import { AxiosDataLoader, BigWigReader } from "../src/";
 
 const testTwoBitFilename = "test.2bit";
 

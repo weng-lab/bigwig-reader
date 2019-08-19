@@ -1,11 +1,11 @@
 import Axios from "axios";
-import { AxiosDataLoader } from "../../src/DataLoader";
+import { AxiosDataLoader } from "../../src/loader/AxiosDataLoader";
 import { BamHeader, readBamHeaderData } from "../../src/bam/BamHeaderReader";
 import { BamIndexData, readBamIndex } from "../../src/bam/BamIndexReader";
 
 const testBamIndexFilename = "test.bam.bai";
 const testBamFilename = "test.bam";
-/*
+
 describe("BamHeaderReader", () => {
     it("should read header", async () => {
         const indexLoader = new AxiosDataLoader(`http://localhost:8001/${testBamIndexFilename}`, Axios.create());
@@ -16,4 +16,4 @@ describe("BamHeaderReader", () => {
         expect(header.chromToId).toHaveProperty("chr22");
         expect(Object.keys(header.chromToId)).toHaveLength(195);
     });
-});*/
+});

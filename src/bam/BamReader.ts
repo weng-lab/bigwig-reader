@@ -1,23 +1,8 @@
-import { DataLoader } from "../DataLoader";
+import { DataLoader } from "../loader/DataLoader";
 import { readBamHeaderData, BamHeader } from "./BamHeaderReader";
 import { blocksForRange, Chunk, BamIndexData, readBamIndex } from "./BamIndexReader";
 import { bgzfUnzip } from "./Bgzf";
-import { BinaryParser } from "../BinaryParser";
-
-enum BamAlignmentFlag {
-    READ_PAIRED,
-    PROPER_PAIR,
-    READ_UNMAPPED,
-    MATE_UNMAPPED,
-    READ_STRAND,
-    MATE_STRAND,
-    FIRST_OF_PAIR,
-    SECOND_OF_PAIR,
-    SECONDARY_ALIGNMNET,
-    READ_FAILS_VENDOR_QUALITY_CHECK,
-    DUPLICATE_READ,
-    SUPPLEMENTARY_ALIGNMENT
-}
+import { BinaryParser } from "../util/BinaryParser";
 
 export interface CigarOp {
     opLen: number;
@@ -47,15 +32,47 @@ export interface BamAlignment {
     cigarOps: Array<CigarOp>;
     templateLength: number;
     mappingQuality: number;
+    seq: string;
+    phredQualities: Array<number>;
+    lengthOnRef: number;
+}
 
+export function isFlagged(bitwiseFlags: number, flag: BamAlignmentFlag) {
+    return !!(bitwiseFlags & flag);
+}
+
+export enum BamAlignmentFlag {
+    // template having multiple segments in sequencing
+    READ_PAIRED = 0x1,
+    // each segment properly aligned according to the aligner
+    PROPER_PAIR = 0x2,
+    // segment unmapped
+    READ_UNMAPPED = 0x4,
+    // next segment in the template unmapped
+    MATE_UNMAPPED = 0x8,
+    // SEQ being reverse complemented
+    READ_STRAND = 0x10,
+    // SEQ of the next segment in the template being reverse complemented
+    MATE_STRAND = 0x20,
+    // the first segment in the template
+    FIRST_OF_PAIR = 0x40,
+    // the last segment in the template
+    SECOND_OF_PAIR = 0x80,
+    // secondary alignment
+    SECONDARY_ALIGNMNET = 0x100,
+    // not passing filters, such as platform/vendor quality controls
+    READ_FAILS_VENDOR_QUALITY_CHECK = 0x200,
+    // PCR or optical duplicate
+    DUPLICATE_READ = 0x400,
+    // supplementary alignment
+    SUPPLEMENTARY_ALIGNMENT = 0x800
 }
 
 const MAX_GZIP_BLOCK_SIZE = 65536; // See BGZF compression format in SAM format specification
 const CIGAR_DECODER = "MIDNSHP=X";
 const SEQ_CONSUMING_CIGAR_OPS = "MIS=X";
+const REF_CONSUMING_CIGAR_OPS = "MDN=X";
 const SEQ_DECODER = "=ACMGRSVTWYHKDBN";
-const READ_STRAND_FLAG = 0x10;
-const MATE_STRAND_FLAG = 0x20;
 
 export class BamReader {
 
@@ -73,7 +90,8 @@ export class BamReader {
             const unzippedChunk: ArrayBuffer = bgzfUnzip(chunkBytes);
             const chunkAlignments = readBamFeatures(unzippedChunk.slice(chunk.start.dataPosition), 
                 headerData.idToChrom, refId, start, end);
-            alignments.concat(chunkAlignments);
+            // Append all chunk alignments to alignments
+            chunkAlignments.forEach(ca => alignments.push(ca));
         }
         return alignments;
     }
@@ -81,7 +99,7 @@ export class BamReader {
 }
 
 /**
- * Parses
+ * Parses bam features from raw unzipped data.
  * 
  * @param blocksData blocks of uncompressed data to parse bam alignments from.
  * @param idToChr map of reference (chromosome) ids (used by file) to names.
@@ -93,9 +111,10 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
         bpStart: number, bpEnd: number): Array<BamAlignment> {
     const parser = new BinaryParser(blocksData);
 
-    const alignments = new Array<BamAlignment>()
+    const alignments = new Array<BamAlignment>();
     while (parser.position < blocksData.byteLength) {
         const blockSize = parser.getInt();
+        const blockEnd = parser.position + blockSize;
         
         // If we don't have enough data to read, exit.
         if (blockSize + parser.position > blocksData.byteLength) break;
@@ -107,28 +126,35 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
         const bin = parser.getUShort();
         const numCigarOps = parser.getUShort();
         const flags = parser.getUShort();
-        const strand = !(flags & READ_STRAND_FLAG);
+        const strand = !isFlagged(flags, BamAlignmentFlag.READ_STRAND);
         const seqLen = parser.getInt();
         const mateChrIdx = parser.getInt();
         const matePos = parser.getInt();
         const templateLen = parser.getInt();
         const readName = parser.getString(readNameLen);
-    
+
         // If read is unmapped or read does not overlap with given chr, start, and end, continue
-        if (blockRefID === -1 || refId !== blockRefID || pos > bpEnd || 
-            pos + seqLen < bpStart) continue;
+        if (blockRefID === -1 || refId !== blockRefID || pos > bpEnd || pos + seqLen < bpStart) {
+            parser.position = blockEnd;
+            continue;
+        }
 
         // Build CIGAR
         const cigarOps = new Array<CigarOp>();
         let seqOffset = 0;
+        let lengthOnRef = 0;
         for (let i = 0; i < numCigarOps; i++) {
             const rawCigar = parser.getUInt();
             const opLen = rawCigar >> 4;
             const op = CIGAR_DECODER.charAt(rawCigar & 0xf);
             
             cigarOps.push({ opLen, op, seqOffset });
+
             if (SEQ_CONSUMING_CIGAR_OPS.includes(op)) {
                 seqOffset += opLen;
+            }
+            if (REF_CONSUMING_CIGAR_OPS.includes(op)) {
+                lengthOnRef += opLen;
             }
         }
     
@@ -144,9 +170,9 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
         const sequence = seqChars.slice(0, seqLen).join('');
     
         // Build Phred-scaled base qualities
-        const phred = new Array<number>();
-        for (let i = 0; i < seqBytes; i++) {
-            phred.push(parser.getByte());
+        const phredQualities = new Array<number>();
+        for (let i = 0; i < seqLen; i++) {
+            phredQualities.push(parser.getByte());
         }
     
         // Add Mate
@@ -155,7 +181,7 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
             mate = {
                 chr: idToChr[mateChrIdx],
                 position: matePos,
-                strand: !(flags & MATE_STRAND_FLAG)
+                strand: !isFlagged(flags, BamAlignmentFlag.MATE_STRAND)
             }
         }
     
@@ -167,8 +193,15 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
             readName: readName,
             cigarOps: cigarOps,
             templateLength: templateLen,
-            mappingQuality: mappingQuality
+            mappingQuality: mappingQuality,
+            seq: sequence,
+            phredQualities: phredQualities,
+            lengthOnRef: lengthOnRef
         });
+        
+        // We need to jump to the end of the block here because we're skipping reading tags.
+        parser.position = blockEnd;
     }
+
     return alignments;
 }
