@@ -28,7 +28,7 @@ const loader = new AxiosDataLoader("http://localhost/sample.bigwig", /* Optional
 const reader = new BigWigReader(loader);
 ```
 
-### Reading data
+### Reading BigWig / BigBed data
 To read file header data do
 ```typescript
 const header: HeaderData = await reader.getHeader();
@@ -45,6 +45,33 @@ const bedData: BigBedData[] = await reader.readBigBedData("chr21", 10_000_000, "
 // Get zoom data (from BigWig or BigBed files)
 // You can find Zoom Level Index in HeaderData.zoomLevelHeaders.index
 const zoomData: BigZoomData[] = await reader.readZoomData("chr2", 0, "chr6", 1000, /* Zoom Level Index */ 9);
+```
+
+### BAM Support
+
+Currently, only indexed reads using bai indexes are supported.
+
+Unlike "big" file indexes, the entire bam index needs to be read to be useful, so the 
+BamReader will read and cache the entire index on the first read.
+
+The BAM header is also cached with the reader. These cached objects should be garbage 
+collected with the reader.
+
+```typescript
+// Create data loaders for bam and index
+const bamLoader = new AxiosDataLoader("http://localhost/sample.bam");
+const bamIndexLoader = new AxiosDataLoader("http://localhost/sample.bam.bai");
+
+const reader = new BamReader(loader);
+// First read will load entire index and bam header into memory.
+const alignments: BamAlignment[] = await reader.read("chr22", 20_000_000, 20_010_000);
+// Subsequent reads will use cached index and header.
+const otherAlignments: BamAlignment[] = await reader.read("chr22", 20_010_000, 20_020_000);
+
+// This will fetch the parsed index. Uses cache.
+const bamIndex: BamIndexData = await reader.getIndexData();
+// This will fetch the parsed header. Uses cache.
+const bamHeader: BamHeader = await reader.getHeaderData();
 ```
 
 ## For contributers

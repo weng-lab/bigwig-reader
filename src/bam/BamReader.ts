@@ -79,22 +79,31 @@ const SEQ_DECODER = "=ACMGRSVTWYHKDBN";
  * Needs to read entire index to work. Caches index and header.
  */
 export class BamReader {
-
-    private indexData?: BamIndexData = undefined;
-    private headerData?: BamHeader = undefined;
-
+    
     constructor(private bamDataLoader: DataLoader, private bamIndexDataLoader: DataLoader) { }
 
-    async read(chr: string, start: number, end: number): Promise<Array<BamAlignment>> {
+    private indexData?: BamIndexData = undefined;
+    async getIndexData(): Promise<BamIndexData> {
         if (this.indexData === undefined) {
             this.indexData = await readBamIndex(this.bamIndexDataLoader);
         }
-        if (this.headerData === undefined) {
-            this.headerData = await readBamHeaderData(this.bamDataLoader, this.indexData.firstAlignmentBlock);
-        }
+        return this.indexData;
+    }
 
-        const refId = this.headerData.chromToId[chr];
-        const chunks: Array<Chunk> = await blocksForRange(this.indexData, refId, start, end);
+    private headerData?: BamHeader = undefined;
+    async getHeaderData(): Promise<BamHeader> {
+        if (this.headerData === undefined) {
+            const indexData = await this.getIndexData();
+            this.headerData = await readBamHeaderData(this.bamDataLoader, indexData.firstAlignmentBlock);
+        }
+        return this.headerData;
+    }
+
+    async read(chr: string, start: number, end: number): Promise<Array<BamAlignment>> {
+        const indexData = await this.getIndexData();
+        const headerData = await this.getHeaderData();
+        const refId = headerData.chromToId[chr];
+        const chunks: Array<Chunk> = await blocksForRange(indexData, refId, start, end);
         return await readBam(this.bamDataLoader, chunks, refId, chr, start, end);
     }
 
