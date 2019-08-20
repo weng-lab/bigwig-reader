@@ -51,10 +51,9 @@ const zoomData: BigZoomData[] = await reader.readZoomData("chr2", 0, "chr6", 100
 Currently, only indexed reads using bai indexes are supported.
 
 Unlike "big" file indexes, the entire bam index needs to be read to be useful, so the 
-BamReader will read and cache the entire index on the first read.
+BamReader will read and cache the entire index on the first read. 
 
-The BAM header is also cached with the reader. These cached objects should be garbage 
-collected with the reader.
+The BAM header is also automatically read and cached with the reader.
 
 ```typescript
 // Create data loaders for bam and index
