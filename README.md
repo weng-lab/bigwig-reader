@@ -47,8 +47,7 @@ const bedData: BigBedData[] = await reader.readBigBedData("chr21", 10_000_000, "
 const zoomData: BigZoomData[] = await reader.readZoomData("chr2", 0, "chr6", 1000, /* Zoom Level Index */ 9);
 ```
 
-### BAM Support
-
+### Reading BAM data
 Currently, only indexed reads using bai indexes are supported.
 
 Unlike "big" file indexes, the entire bam index needs to be read to be useful, so the 
