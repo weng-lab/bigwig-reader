@@ -37,7 +37,7 @@ export interface BamAlignment {
     lengthOnRef: number;
 }
 
-export function isFlagged(bitwiseFlags: number, flag: BamAlignmentFlag) {
+export function isFlagged(bitwiseFlags: number, flag: BamAlignmentFlag): boolean {
     return !!(bitwiseFlags & flag);
 }
 
@@ -68,7 +68,6 @@ export enum BamAlignmentFlag {
     SUPPLEMENTARY_ALIGNMENT = 0x800
 }
 
-const MAX_GZIP_BLOCK_SIZE = 65536; // See BGZF compression format in SAM format specification
 const CIGAR_DECODER = "MIDNSHP=X";
 const SEQ_CONSUMING_CIGAR_OPS = "MIS=X";
 const REF_CONSUMING_CIGAR_OPS = "MDN=X";

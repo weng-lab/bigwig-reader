@@ -34,14 +34,15 @@ const BAI_MAGIC = 21578050;
 const PSEUDO_BIN_MAGIC = 37450;
 
 /**
+ * Given index data and a range return all possible regions matching alignments could be in.
  * 
  * @param bamIndexRefData 
  * @param refId 
  * @param start 
  * @param end 
  */
-export async function blocksForRange(indexData: BamIndexData, refId: number, 
-        start: number, end: number): Promise<Array<Chunk>> {
+export function blocksForRange(indexData: BamIndexData, refId: number, 
+        start: number, end: number): Array<Chunk> {
     const overlappingBins: Array<number> = reg2bins(start, end);
     const binIndex: BinIndex = indexData.refData[refId].binIndex;
     const linearIndex: Array<VirtualOffset> = indexData.refData[refId].linearIndex;
