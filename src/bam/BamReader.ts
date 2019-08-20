@@ -7,7 +7,7 @@ import { BinaryParser } from "../util/BinaryParser";
 export interface CigarOp {
     opLen: number;
     op: string;
-    seqOffset: number;   
+    seqOffset: number;
 }
 
 export interface BamAlignmentMate {
@@ -74,48 +74,75 @@ const SEQ_CONSUMING_CIGAR_OPS = "MIS=X";
 const REF_CONSUMING_CIGAR_OPS = "MDN=X";
 const SEQ_DECODER = "=ACMGRSVTWYHKDBN";
 
+/**
+ * BamReader class that can read ranges of data from BAM alignment files with and index.
+ * Needs to read entire index to work. Caches index and header.
+ */
 export class BamReader {
+
+    private indexData?: BamIndexData = undefined;
+    private headerData?: BamHeader = undefined;
 
     constructor(private bamDataLoader: DataLoader, private bamIndexDataLoader: DataLoader) { }
 
     async read(chr: string, start: number, end: number): Promise<Array<BamAlignment>> {
-        const indexData: BamIndexData = await readBamIndex(this.bamIndexDataLoader);
-        const headerData: BamHeader = await readBamHeaderData(this.bamDataLoader, indexData.firstAlignmentBlock);
-        const refId = headerData.chromToId[chr];
-        const chunks: Array<Chunk> = await blocksForRange(indexData, refId, start, end);
-        const alignments = Array<BamAlignment>();
-        for (let chunk of chunks) {
-            const bufSize = chunk.end.blockPosition + (1 << 16) - chunk.start.blockPosition;
-            const chunkBytes: ArrayBuffer = await this.bamDataLoader.load(chunk.start.blockPosition, bufSize);
-            const unzippedChunk: ArrayBuffer = bgzfUnzip(chunkBytes);
-            const chunkAlignments = readBamFeatures(unzippedChunk.slice(chunk.start.dataPosition), 
-                headerData.idToChrom, refId, start, end);
-            // Append all chunk alignments to alignments
-            chunkAlignments.forEach(ca => alignments.push(ca));
+        if (this.indexData === undefined) {
+            this.indexData = await readBamIndex(this.bamIndexDataLoader);
         }
-        return alignments;
+        if (this.headerData === undefined) {
+            this.headerData = await readBamHeaderData(this.bamDataLoader, this.indexData.firstAlignmentBlock);
+        }
+
+        const refId = this.headerData.chromToId[chr];
+        const chunks: Array<Chunk> = await blocksForRange(this.indexData, refId, start, end);
+        return await readBam(this.bamDataLoader, chunks, refId, chr, start, end);
     }
 
+}
+
+/**
+ * Reads alignments from a bam file given file regions to look ("chunks") from an index and search parameters.
+ * 
+ * @param bamDataLoader the data loader for the bam file.
+ * @param chunks regions to look for matching alignments.
+ * @param refId The file's reference id for the given chromosome.
+ * @param chr the chr
+ * @param start 
+ * @param end 
+ */
+export async function readBam(bamDataLoader: DataLoader, chunks: Array<Chunk>, refId: number, chr: string,
+    start: number, end: number): Promise<Array<BamAlignment>> {
+    const alignments = Array<BamAlignment>();
+    for (let chunk of chunks) {
+        const bufSize = chunk.end.blockPosition + (1 << 16) - chunk.start.blockPosition;
+        const chunkBytes: ArrayBuffer = await bamDataLoader.load(chunk.start.blockPosition, bufSize);
+        const unzippedChunk: ArrayBuffer = bgzfUnzip(chunkBytes);
+        const chunkAlignments = readBamFeatures(unzippedChunk.slice(chunk.start.dataPosition),
+            refId, chr, start, end);
+        // Append all chunk alignments to alignments
+        chunkAlignments.forEach(ca => alignments.push(ca));
+    }
+    return alignments;
 }
 
 /**
  * Parses bam features from raw unzipped data.
  * 
  * @param blocksData blocks of uncompressed data to parse bam alignments from.
- * @param idToChr map of reference (chromosome) ids (used by file) to names.
  * @param refId lookup reference id
+ * @param chr name of chromosome for reference id.
  * @param bpStart lookup start base pair
  * @param bpEnd lookup end base pair
  */
-function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId: number, 
-        bpStart: number, bpEnd: number): Array<BamAlignment> {
+function readBamFeatures(blocksData: ArrayBuffer, refId: number, chr: string,
+    bpStart: number, bpEnd: number): Array<BamAlignment> {
     const parser = new BinaryParser(blocksData);
 
     const alignments = new Array<BamAlignment>();
     while (parser.position < blocksData.byteLength) {
         const blockSize = parser.getInt();
         const blockEnd = parser.position + blockSize;
-        
+
         // If we don't have enough data to read, exit.
         if (blockSize + parser.position > blocksData.byteLength) break;
 
@@ -147,7 +174,7 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
             const rawCigar = parser.getUInt();
             const opLen = rawCigar >> 4;
             const op = CIGAR_DECODER.charAt(rawCigar & 0xf);
-            
+
             cigarOps.push({ opLen, op, seqOffset });
 
             if (SEQ_CONSUMING_CIGAR_OPS.includes(op)) {
@@ -157,7 +184,7 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
                 lengthOnRef += opLen;
             }
         }
-    
+
         // Build sequence
         const seqChars = new Array<string>();
         const seqBytes = (seqLen + 1) / 2;
@@ -168,25 +195,25 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
         }
         // Slice because seqChars might have one extra character (if seqLen is an odd number)
         const sequence = seqChars.slice(0, seqLen).join('');
-    
+
         // Build Phred-scaled base qualities
         const phredQualities = new Array<number>();
         for (let i = 0; i < seqLen; i++) {
             phredQualities.push(parser.getByte());
         }
-    
+
         // Add Mate
         let mate: BamAlignmentMate;
         if (mateChrIdx >= 0) {
             mate = {
-                chr: idToChr[mateChrIdx],
+                chr: chr,
                 position: matePos,
                 strand: !isFlagged(flags, BamAlignmentFlag.MATE_STRAND)
             }
         }
-    
+
         alignments.push({
-            chr: idToChr[blockRefID],
+            chr: chr,
             start: pos,
             flags: flags,
             strand: strand,
@@ -198,7 +225,7 @@ function readBamFeatures(blocksData: ArrayBuffer, idToChr: Array<string>, refId:
             phredQualities: phredQualities,
             lengthOnRef: lengthOnRef
         });
-        
+
         // We need to jump to the end of the block here because we're skipping reading tags.
         parser.position = blockEnd;
     }
