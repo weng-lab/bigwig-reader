@@ -1,5 +1,5 @@
 # BigWig Reader
-A Typescript library for reading BigWig and BigBed files. Heavily influenced by [igv.js](https://github.com/igvteam/igv.js). For use in the browser or on Node.js.
+A Typescript library for reading BigWig, BigBed, and Bam files. Heavily influenced by [igv.js](https://github.com/igvteam/igv.js). For use in the browser or on Node.js.
 
 Brought to you by UMass Medical School, Weng Lab.
 
