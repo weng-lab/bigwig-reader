@@ -60,7 +60,7 @@ The BAM header is also automatically read and cached with the reader.
 const bamLoader = new AxiosDataLoader("http://localhost/sample.bam");
 const bamIndexLoader = new AxiosDataLoader("http://localhost/sample.bam.bai");
 
-const reader = new BamReader(loader);
+const reader = new BamReader(bamLoader, bamIndexLoader);
 // First read will load entire index and bam header into memory.
 const alignments: BamAlignment[] = await reader.read("chr22", 20_000_000, 20_010_000);
 // Subsequent reads will use cached index and header.
