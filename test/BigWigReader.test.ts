@@ -1,7 +1,5 @@
 import Axios from "axios";
-import { AxiosDataLoader } from "../src/DataLoader";
-import { BigWigReader } from "../src/BigWigReader";
-import { HeaderData } from "../src/BigWigHeaderReader";
+import { AxiosDataLoader, BigWigReader, HeaderData } from "../src/";
 
 const testBWFilename = "testbw.bigwig";
 const testBWFixedStepName = "test.fixedstep.bigwig";
@@ -14,8 +12,8 @@ describe("BigWigReader", () => {
         const reader = new BigWigReader(loader);
         const header: HeaderData = await reader.getHeader();
         expect(header).toBeDefined;
-        expect(header.common.bwVersion).toBe(4);
-        expect(header.common.nZoomLevels).toBe(10);
+        expect(header.common!.bwVersion).toBe(4);
+        expect(header.common!.nZoomLevels).toBe(10);
     });
 
     it("should read unzoomed bigwig data", async() => {
@@ -79,9 +77,9 @@ describe("BigWigReader", () => {
         expect(data[0].chr).toBe("chr21");
         expect(data[0].start).toBe(9_928_613);
         expect(data[0].end).toBe(10_012_791);
-        expect(data[0].exons.length).toBe(22);
-        expect(data[0].exons[0].start).toBe(9_928_613);
-        expect(data[0].exons[0].end).toBe(9_928_911);
+        expect(data[0].exons!.length).toBe(22);
+        expect(data[0].exons![0].start).toBe(9_928_613);
+        expect(data[0].exons![0].end).toBe(9_928_911);
     });
 
     it("should read fixed step bigwig data", async () => {

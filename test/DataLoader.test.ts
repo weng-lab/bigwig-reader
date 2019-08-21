@@ -1,4 +1,5 @@
-import { AxiosDataLoader, BufferedDataLoader } from "../src/DataLoader";
+import { AxiosDataLoader } from "../src/loader";
+import { BufferedDataLoader } from "../src/loader/DataLoader";
 import Axios from "axios";
 import { stat, open, read } from "fs";
 import { promisify } from "util";
