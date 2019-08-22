@@ -41,11 +41,11 @@ const PSEUDO_BIN_MAGIC = 37450;
  * @param start 
  * @param end 
  */
-export function blocksForRange(indexData: BamIndexData, refId: number, 
+export function blocksForRange(indexData: BamIndexRefData, refId: number, 
         start: number, end: number): Array<Chunk> {
     const overlappingBins: Array<number> = reg2bins(start, end);
-    const binIndex: BinIndex = indexData.refData[refId].binIndex;
-    const linearIndex: Array<VirtualOffset> = indexData.refData[refId].linearIndex;
+    const binIndex: BinIndex = indexData.binIndex;
+    const linearIndex: Array<VirtualOffset> = indexData.linearIndex;
     
     // Get all chunks for overlapping bins.
     let allChunks: Array<Chunk> = [];

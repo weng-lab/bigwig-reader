@@ -102,7 +102,7 @@ export class BamReader {
         const indexData = await this.getIndexData();
         const headerData = await this.getHeaderData();
         const refId = headerData.chromToId[chr];
-        const chunks: Array<Chunk> = await blocksForRange(indexData, refId, start, end);
+        const chunks: Array<Chunk> = await blocksForRange(indexData.refData[refId], refId, start, end);
         return await readBam(this.bamDataLoader, chunks, refId, chr, start, end);
     }
 
