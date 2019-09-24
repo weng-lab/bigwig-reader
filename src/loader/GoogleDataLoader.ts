@@ -21,11 +21,11 @@ export class GoogleBucketDataLoader implements DataLoader {
 	const fsize = +(await this.file_.getMetadata({
 	    userProject: this.billedProject
 	}))[0].size;
-	const bsize = (size && size <= fsize ? size : fsize) - start;
+	const bsize = size === undefined || size + start > fsize ? fsize - start : size;
 	const stream = await this.file_.createReadStream({
 	    userProject: this.billedProject,
 	    start,
-	    end: start - 1 + (size || bsize)
+	    end: start - 1 + bsize
 	});
 	if (!stream) throw new Error("could not open gs://" + this.bucket + "/" + this.file);
 	
@@ -36,10 +36,10 @@ export class GoogleBucketDataLoader implements DataLoader {
 		buffer.set(chunk, ptr);
 		ptr += chunk.length;
 	    } else
-		throw new Error("could not read " + size + " bytes from gs://" + this.bucket + "/" + this.file + "; did read " + ptr);
+		throw new Error("could not read " + bsize + " bytes from gs://" + this.bucket + "/" + this.file + "; did read " + ptr);
 	}
 	if (ptr !== buffer.length)
-	    throw new Error("could not read " + size + " bytes from gs://" + this.bucket + "/" + this.file + "; did read " + ptr);
+	    throw new Error("could not read " + bsize + " bytes from gs://" + this.bucket + "/" + this.file + "; did read " + ptr);
 	
 	return buffer.buffer as ArrayBuffer;
 	
