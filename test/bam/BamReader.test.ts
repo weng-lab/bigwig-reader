@@ -27,6 +27,6 @@ describe("BamReader", () => {
             readName: "SOLEXA-1GA-2:3:13:303:913#0",
             cigarOps: [{ op: "M", opLen: 36, seqOffset: 0 }],
             lengthOnRef: 36
-        })
-    });
+        });
+    }, 30_000);
 });
