@@ -57,10 +57,10 @@ export class FileFormatError extends Error {
     }
 }
 
-
 /**
- * Wrapper for other DataLoaders that buffers. Used internally by the BigWigReader.
- * This class does not implement DataLoader. It is not meant to be passed in in BigWigReader as the DataLoader you must provide.
+ * Wrapper for other DataLoaders that buffers. 
+ * Used internally by the BigWigReader. This class does not implement DataLoader. 
+ * It is not meant to be passed in in BigWigReader as the DataLoader you must provide.
  * 
  * When you initially request data, potentially much more (bufferSize) than you ask for is loaded into a buffer.
  * This buffer is checked first for subsequent requests.
@@ -94,7 +94,7 @@ export class BufferedDataLoader {
             data: data,
             start: start,
             size: data.byteLength
-        }
+        };
 
         if (size > data.byteLength) {
             throw new IOError(`Requested ${size} bytes but only got back ${this.buffer.size}`);

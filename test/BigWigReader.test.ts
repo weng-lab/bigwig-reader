@@ -1,5 +1,6 @@
 import Axios from "axios";
-import { AxiosDataLoader, BigWigReader, HeaderData } from "../src/";
+import { AxiosDataLoader, BigWigReader, HeaderData, BigWigData } from "../src/";
+import { streamToArray } from "./testUtils";
 
 const testBWFilename = "testbw.bigwig";
 const testBWFixedStepName = "test.fixedstep.bigwig";
@@ -35,6 +36,27 @@ describe("BigWigReader", () => {
         });
     });
 
+    it("should stream unzoomed bigwig data", async() => {
+        const loader = new AxiosDataLoader(`http://localhost:8001/${testBWFilename}`, Axios.create());
+        const reader = new BigWigReader(loader);
+        const stream = await reader.streamBigWigData("chr14", 19_485_000, "chr14", 20_000_100);
+
+        const data = await streamToArray<BigWigData>(stream);
+        expect(data.length).toBe(83);
+        expect(data[0]).toEqual({
+            chr: "chr14", 
+            start: 19_485_969, 
+            end: 19_485_974, 
+            value: 1
+        });
+        expect(data[10]).toEqual({
+            chr: "chr14", 
+            start: 19_486_029, 
+            end: 19_486_030, 
+            value: 1959
+        });
+    });
+    
     it("should read more unzoomed bigwig data", async() => {
         const loader = new AxiosDataLoader(`http://localhost:8001/${testBWFilename}`, Axios.create());
         const reader = new BigWigReader(loader);

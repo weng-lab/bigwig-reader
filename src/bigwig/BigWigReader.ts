@@ -3,6 +3,8 @@ import { BinaryParser } from "../util/BinaryParser";
 import { loadHeaderData, HeaderData, FileType } from "./BigWigHeaderReader";
 import { loadSequenceRecord, loadSequence, SequenceRecord } from "./TwoBitHeaderReader";
 import { inflate } from "pako";
+import { Stream, Readable, Writable, Duplex } from "stream";
+import { start } from "repl";
 
 export interface BigWigData {
     chr: string,
@@ -112,8 +114,25 @@ export class BigWigReader {
      * @param endBase Ending base pair
      * @param zoomLevelIndex The ZoomLevelHeader.index from the zoom level you want to read from. 
      */
-    async readBigWigData(startChrom: string, startBase: number, endChrom: string, endBase: number): Promise<Array<BigWigData>> {
-        return this.readData<BigWigData>(startChrom, startBase, endChrom, endBase, (await this.getHeader()).common!.fullIndexOffset, decodeWigData);
+    async readBigWigData(startChrom: string, startBase: number, endChrom: string, 
+            endBase: number): Promise<Array<BigWigData>> {
+        return this.readData<BigWigData>(startChrom, startBase, endChrom, endBase, 
+            (await this.getHeader()).common!.fullIndexOffset, decodeWigData);
+    }
+
+    /**
+     * Method for streaming unzoomed wig data from BigWig files.
+     * 
+     * @param startChrom Starting chromosome
+     * @param startBase Starting base pair
+     * @param endChrom Ending chromose
+     * @param endBase Ending base pair
+     * @param zoomLevelIndex The ZoomLevelHeader.index from the zoom level you want to read from. 
+     */
+    async streamBigWigData(startChrom: string, startBase: number, endChrom: string, 
+            endBase: number): Promise<Readable> {
+        return this.streamData<BigWigData>(startChrom, startBase, endChrom, endBase, 
+            (await this.getHeader()).common!.fullIndexOffset, decodeWigData);
     }
 
     /**
@@ -124,8 +143,24 @@ export class BigWigReader {
      * @param endChrom Ending chromose
      * @param endBase Ending base pair
      */
-    async readBigBedData(startChrom: string, startBase: number, endChrom: string, endBase: number): Promise<Array<BigBedData>> {
-        return this.readData<BigBedData>(startChrom, startBase, endChrom, endBase, (await this.getHeader()).common!.fullIndexOffset, decodeBedData);
+    async readBigBedData(startChrom: string, startBase: number, endChrom: string, 
+            endBase: number): Promise<Array<BigBedData>> {
+        return this.readData<BigBedData>(startChrom, startBase, endChrom, endBase, 
+            (await this.getHeader()).common!.fullIndexOffset, decodeBedData);
+    }
+
+    /**
+     * Method for streaming unzoomed bed data from BigBed files.
+     * 
+     * @param startChrom Starting chromosome
+     * @param startBase Starting base pair
+     * @param endChrom Ending chromose
+     * @param endBase Ending base pair
+     */
+    async streamBigBedData(startChrom: string, startBase: number, endChrom: string, 
+            endBase: number): Promise<Readable> {
+        return this.streamData<BigBedData>(startChrom, startBase, endChrom, endBase, 
+            (await this.getHeader()).common!.fullIndexOffset, decodeBedData);
     }
 
     /**
@@ -136,7 +171,7 @@ export class BigWigReader {
      * @param endBase the ending base.
      */
     async readTwoBitData(chrom: string, startBase: number, endBase: number): Promise<string> {
-	let sequence: SequenceRecord = await this.getSequenceRecord(chrom);
+	    let sequence: SequenceRecord = await this.getSequenceRecord(chrom);
         return loadSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase);
     }
 
@@ -149,13 +184,35 @@ export class BigWigReader {
      * @param endBase Ending base pair
      * @param zoomLevelIndex index of the zoom level. You can call getHeader() for a list of these values under HeaderData.zoomLevelHeaders.
      */
-    async readZoomData(startChrom: string, startBase: number, endChrom: string, endBase: number, zoomLevelIndex: number): Promise<Array<BigZoomData>> {
+    async readZoomData(startChrom: string, startBase: number, endChrom: string, endBase: number, 
+            zoomLevelIndex: number): Promise<Array<BigZoomData>> {
         const header = await this.getHeader();
         if (undefined == header.zoomLevelHeaders || !(zoomLevelIndex in header.zoomLevelHeaders)) {
             throw new FileFormatError("Given zoomLevelIndex not found in zoom level headers.");
         }
         const treeOffset = header.zoomLevelHeaders[zoomLevelIndex].indexOffset;
-        return this.readData<BigZoomData>(startChrom, startBase, endChrom, endBase, treeOffset, decodeZoomData);
+        return this.readData<BigZoomData>(startChrom, startBase, endChrom, endBase, 
+            treeOffset, decodeZoomData);
+    }
+
+    /**
+     * Method for streaming zoomed data from BigWig and BigBed files.
+     * 
+     * @param startChrom Starting chromosome
+     * @param startBase Starting base pair
+     * @param endChrom Ending chromose
+     * @param endBase Ending base pair
+     * @param zoomLevelIndex index of the zoom level. You can call getHeader() for a list of these values under HeaderData.zoomLevelHeaders.
+     */
+    async streamZoomData(startChrom: string, startBase: number, endChrom: string, endBase: number, 
+            zoomLevelIndex: number): Promise<Readable> {
+        const header = await this.getHeader();
+        if (undefined == header.zoomLevelHeaders || !(zoomLevelIndex in header.zoomLevelHeaders)) {
+            throw new FileFormatError("Given zoomLevelIndex not found in zoom level headers.");
+        }
+        const treeOffset = header.zoomLevelHeaders[zoomLevelIndex].indexOffset;
+        return this.streamData<BigZoomData>(startChrom, startBase, endChrom, endBase, 
+            treeOffset, decodeZoomData);
     }
 
     /**
@@ -168,8 +225,8 @@ export class BigWigReader {
      * @param treeOffset Location of the R+ tree that stores the data we're interested.
      * @param decodeFunction 
      */
-    private async readData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, treeOffset: number,
-			      decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
+    private async loadData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, treeOffset: number,
+			      decodeFunction: DecodeFunction<T>, loadFunction: LoadFunction<T>): Promise<void> {
         const header = await this.getHeader();
         if (undefined == header.chromTree) {
             throw new FileFormatError("No chromosome tree found in file header.");
@@ -194,7 +251,6 @@ export class BigWigReader {
             startChromIndex, startBase, endChromIndex, endBase);
 
         // Iterate through filtered leaf nodes, load the data, and decode it
-        const decodedData: Array<T> = [];
         for (const leafNode of leafNodes) {
             let leafData = new Uint8Array(await bufferedLoader.load(leafNode.dataOffset, leafNode.dataSize));
             if (header.common!.uncompressBuffSize > 0) {
@@ -202,9 +258,27 @@ export class BigWigReader {
             }
             let leafDecodedData = decodeFunction(leafData.buffer as ArrayBuffer, startChromIndex, startBase, endChromIndex, 
                 endBase, header.chromTree.idToChrom);
-            decodedData.push(...leafDecodedData);
+            loadFunction(leafDecodedData);
         }
-        return decodedData;
+    }
+
+    private async readData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, 
+            treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
+        const data: Array<T> = [];
+        const load: LoadFunction<T> = (d: T[]) => data.push(...d);
+        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, decodeFunction, load);
+        return data;
+    };
+
+    private async streamData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, 
+            treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Readable> {
+        const stream = new Readable({ objectMode: true, read() {} });
+        const load: LoadFunction<T> = (d: T[]) => {
+            d.forEach((el) => stream.push(el));
+        };
+        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, decodeFunction, load);
+        stream.push(null);
+        return stream;
     }
 
 }
@@ -221,7 +295,7 @@ export class BigWigReader {
  * @returns List of simple representations of leaf nodes for the given node offset.
  */
 async function loadLeafNodesForRPNode(bufferedLoader: BufferedDataLoader, littleEndian: boolean, rpNodeOffset: number, startChromIndex: number,
-    startBase: number, endChromIndex: number, endBase: number): Promise<Array<RPLeafNode>> {
+        startBase: number, endChromIndex: number, endBase: number): Promise<Array<RPLeafNode>> {
     const nodeHeaderData: ArrayBuffer = await bufferedLoader.load(rpNodeOffset, 4);
     const nodeHeaderParser = new BinaryParser(nodeHeaderData, littleEndian);
     const isLeaf = 1 === nodeHeaderParser.getByte();
@@ -267,6 +341,8 @@ async function loadLeafNodesForRPNode(bufferedLoader: BufferedDataLoader, little
 
 type DecodeFunction<T> = (data: ArrayBuffer, startChromIndex: number, startBase: number, endChromIndex: number,
     endBase: number, chromDict: Array<string>) => Array<T>;
+
+type LoadFunction<T> = (data: Array<T>) => void;
 
 /**
  * Extract useful data from sections of raw big binary bed data

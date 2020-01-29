@@ -167,7 +167,8 @@ function rn(i: number): string {
  * @param start the start position on the chromsome, 0-based and inclusive.
  * @param end the end position on the chromosome, 0-based and not inclusive.
  */
-export async function loadSequence(dataLoader: DataLoader, header: HeaderData, sequence: SequenceRecord, start: number, end: number): Promise<string> {
+export async function loadSequence(dataLoader: DataLoader, header: HeaderData, 
+        sequence: SequenceRecord, start: number, end: number): Promise<string> {
 
     let interruptingNBlocks = [], interruptingMaskBlocks = [];
     let csequence = "";
@@ -227,5 +228,4 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData, s
     });
 
     return csequence;
-
 }
