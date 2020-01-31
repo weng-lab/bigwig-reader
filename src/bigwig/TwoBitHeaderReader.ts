@@ -205,26 +205,23 @@ export async function loadSequence(dataLoader: DataLoader, header: HeaderData,
     interruptingNBlocks.forEach((block: { start: number, size: number }, i: number): void => {
         let blockEnd = block.start + block.size;
         if (i === 0 && block.start <= start)
-            csequence = rn((blockEnd <= end ? blockEnd : end) - start) + csequence.substring(
-                (blockEnd < end ? blockEnd : end) - start
-            );
+            csequence = rn((blockEnd <= end ? blockEnd : end) - start) + 
+                    csequence.substring((blockEnd < end ? blockEnd : end) - start);
         else
-            csequence = csequence.substring(0, block.start - start) + rn((blockEnd <= end ? blockEnd : end) - block.start) + csequence.substring(
-                (blockEnd < end ? blockEnd : end) - start
-            );
+            csequence = csequence.substring(0, block.start - start) + rn((blockEnd <= end ? blockEnd : end) - block.start) + 
+                    csequence.substring((blockEnd < end ? blockEnd : end) - start);
     });
 
     /* set lower case */
     interruptingMaskBlocks.forEach((block: { start: number, size: number }, i: number): void => {
         let blockEnd = block.start + block.size;
         if (i === 0 && block.start <= start)
-            csequence = csequence.substring(0, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + csequence.substring(
-                (blockEnd < end ? blockEnd : end) - start
-            );
+            csequence = csequence.substring(0, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + 
+                    csequence.substring((blockEnd < end ? blockEnd : end) - start);
         else
-            csequence = csequence.substring(0, block.start - start) + csequence.substring(block.start - start, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + csequence.substring(
-                (blockEnd < end ? blockEnd : end) - start
-            );
+            csequence = csequence.substring(0, block.start - start) + 
+                    csequence.substring(block.start - start, (blockEnd <= end ? blockEnd : end) - start).toLowerCase() + 
+                    csequence.substring((blockEnd < end ? blockEnd : end) - start);
     });
 
     return csequence;

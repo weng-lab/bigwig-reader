@@ -1,5 +1,6 @@
 import { DataLoader, OutOfRangeError } from './DataLoader';
 import Axios, { AxiosInstance, AxiosResponse } from "axios";
+import { Readable } from 'stream';
 
 /**
  * DataLoader for http range requests using Axios library.
@@ -28,6 +29,20 @@ export class AxiosDataLoader implements DataLoader {
         } else {
             return response.data;
         }
+    }
+
+    async loadStream(start: number, size?: number): Promise<Readable> {
+        const response: AxiosResponse<Readable> = await this.axios.get(this.url, { 
+            responseType: 'stream', 
+            headers: { "Range": `bytes=${start}-${size ? start+size-1 : ""}`}
+        });
+
+        // If we get an out of range response
+        if (416 == response.status) {
+            throw new OutOfRangeError(this.url, start, size);
+        }
+
+        return response.data;
     }
 
 }

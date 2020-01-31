@@ -21,6 +21,7 @@ describe("BigWigReader", () => {
         const loader = new AxiosDataLoader(`http://localhost:8001/${testBWFilename}`, Axios.create());
         const reader = new BigWigReader(loader);
         const data = await reader.readBigWigData("chr14", 19_485_000, "chr14", 20_000_100);
+
         expect(data.length).toBe(83);
         expect(data[0]).toEqual({
             chr: "chr14", 
@@ -40,8 +41,8 @@ describe("BigWigReader", () => {
         const loader = new AxiosDataLoader(`http://localhost:8001/${testBWFilename}`, Axios.create());
         const reader = new BigWigReader(loader);
         const stream = await reader.streamBigWigData("chr14", 19_485_000, "chr14", 20_000_100);
-
         const data = await streamToArray<BigWigData>(stream);
+
         expect(data.length).toBe(83);
         expect(data[0]).toEqual({
             chr: "chr14", 

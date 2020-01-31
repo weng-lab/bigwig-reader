@@ -1,3 +1,6 @@
+import { Readable } from "stream";
+import { rejects } from "assert";
+
 export enum ErrorType {
     OUT_OF_RANGE = "OUT_OF_RANGE",
     DATA_MISSING = "DATA_MISSING",
@@ -15,6 +18,8 @@ export enum ErrorType {
 export interface DataLoader {
     // Loads data for the given range
     load: (start: number, size?: number) => Promise<ArrayBuffer>;
+    // Loads data into a stream for the given range
+    loadStream?: (start: number, size?: number) => Promise<Readable>;
 }
 
 /**
@@ -68,16 +73,31 @@ export class FileFormatError extends Error {
 export class BufferedDataLoader {
 
     private buffer?: LoaderBuffer;
+    private stream?: Readable;
 
-    constructor(private dataLoader: DataLoader, private bufferSize: number){}
+    // These two are for waiting for data in stream mode.
+    private streamCaughtUpLock?: StreamCaughtUpLock;
+
+    constructor(
+        private dataLoader: DataLoader, 
+        private bufferSize: number, 
+        private streamMode: boolean = false) {}
 
     async load(start: number, size: number): Promise<ArrayBuffer> {
-        // If the data is in the buffer, return it.
-        const bufferedData = this.getDataFromBuffer(start, size);
-        if (undefined !== bufferedData) {
-            return bufferedData;
+        // If the data isn't in the buffer, load it.
+        if (!this.bufferContainsData(start, size)) {
+            // 
+            if (!this.streamMode) {
+                await this.loadDataIntoBuffer(start);
+            } else {
+                await this.streamDataIntoBuffer(start);
+            }
         }
+        
+        return await this.getDataFromBuffer(start, size);
+    }
 
+    private async loadDataIntoBuffer(start: number) {
         let data;
         try {
             data = await this.dataLoader.load(start, this.bufferSize);
@@ -92,31 +112,92 @@ export class BufferedDataLoader {
         
         this.buffer = {
             data: data,
-            start: start,
-            size: data.byteLength
+            start: start
         };
-
-        if (size > data.byteLength) {
-            throw new IOError(`Requested ${size} bytes but only got back ${this.buffer.size}`);
-        }
-        return this.buffer.data.slice(0, size);
     }
 
-    /**
-     * @returns the given ranges data if it's currently in the buffer. Otherwise returns undefined.
-     */
-    private getDataFromBuffer(start: number, size: number): ArrayBuffer|undefined {
-        if (this.buffer === undefined) {
-            return undefined;
+    private async streamDataIntoBuffer(start: number) {
+        if (this.dataLoader.loadStream === undefined) {
+            throw Error("Stream mode enabled, but DataLoader loadStream function not defined");
         }
+
+        if (this.stream !== undefined) {
+            this.stream.destroy();
+            this.stream = undefined;
+        }
+        try {
+            this.stream = await this.dataLoader.loadStream(start, this.bufferSize);
+        } catch (e) {
+            // If we're out of range, it could mean reaching the end of the file, so retry without a size bound.
+            if (e instanceof OutOfRangeError) {
+                this.stream = await this.dataLoader.loadStream(start);
+            } else {
+                throw e;
+            }
+        }
+
+        const buffer = {
+            data: new ArrayBuffer(0),
+            start: start,
+            remainingBytes: this.bufferSize
+        };
+        this.buffer = buffer;
+
+        this.stream.on('data', (chunk: ArrayBuffer) => {
+            buffer.data = appendBuffer(buffer.data, chunk);
+            buffer.remainingBytes = buffer.remainingBytes -= chunk.byteLength;
+            if (this.streamCaughtUpLock !== undefined) {
+                const dataEndPos = buffer.start + buffer.data.byteLength;
+                this.streamCaughtUpLock.updatePosition(dataEndPos);
+            }
+        });
+        this.stream.on('end', () => {
+            if (this.streamCaughtUpLock !== undefined) {
+                this.streamCaughtUpLock.endStream();
+            }
+        });
+    }
+
+    private bufferContainsData(start: number, size: number): boolean {
+        if (this.buffer === undefined) return false;
         const end = start + size;
-        const bufferEnd = this.buffer.start + this.buffer.size;
-        if (start > this.buffer.start && end < bufferEnd) {
-            const sliceStart = start - this.buffer.start;
-            const sliceEnd = sliceStart + size;
+        let bufferEnd = this.buffer.start + this.buffer.data.byteLength;
+        if (this.buffer.remainingBytes !== undefined) {
+            bufferEnd += this.buffer.remainingBytes;
+        }
+        return start >= this.buffer.start && end <= bufferEnd;
+    }
+
+    /** 
+     * @returns the given ranges data if it's currently in the buffer. Otherwise throws error.
+     * Works under the assumption that we've already loaded / begun streaming the data.
+     */
+    private async getDataFromBuffer(start: number, size: number): Promise<ArrayBuffer> {
+        if (this.buffer === undefined) {
+            throw new Error("Invalid State. Buffer should not be empty");
+        }
+
+        const sliceStart = start - this.buffer.start;
+        const sliceEnd = sliceStart + size;
+
+        if (this.streamMode === false) {
+            if (size > this.buffer.data.byteLength) {
+                throw new IOError(`Requested ${size} bytes but only got back ${this.buffer.data.byteLength}`);
+            }
             return this.buffer.data.slice(sliceStart, sliceEnd);
         }
-        return undefined;
+
+        const currentDataEnd = this.buffer.start + this.buffer.data.byteLength;
+        const requiredEnd = start + size;
+        this.streamCaughtUpLock = new StreamCaughtUpLock(currentDataEnd, requiredEnd);
+        await this.streamCaughtUpLock.waitForStream();
+        
+        const response = this.buffer.data.slice(sliceStart, sliceEnd);
+        // Chop off buffer beginning of buffer to save memory
+        this.buffer.data = this.buffer.data.slice(sliceEnd, this.buffer.data.byteLength);
+        this.buffer.start = this.buffer.start + sliceEnd;
+
+        return response;
     }
 
 }
@@ -124,5 +205,45 @@ export class BufferedDataLoader {
 interface LoaderBuffer {
     data: ArrayBuffer,
     start: number,
-    size: number
+    // Used for streaming mode. Holds the number of bytes left to be loaded.
+    remainingBytes?: number
 }
+
+class StreamCaughtUpLock {
+
+    private promise: Promise<void>;
+    private promiseResolve: ((value?: void | PromiseLike<void>) => void)|undefined;
+    private promiseReject: ((reason?: string) => void)|undefined;
+
+    constructor(private currentPos: number, private caughtUpPos: number) {
+        this.promise = new Promise((resolve, reject) => {
+            if(this.currentPos >= this.caughtUpPos) resolve();
+            this.promiseResolve = resolve;
+            this.promiseReject = reject;
+        });
+    }
+
+    waitForStream(): Promise<void> {
+        return this.promise;
+    }
+
+    updatePosition(position: number) { 
+        this.currentPos = position;
+        if (this.promiseResolve !== undefined && this.currentPos >= this.caughtUpPos) {
+            this.promiseResolve();
+        }
+    }
+
+    endStream() {
+        if (this.promiseReject !== undefined && this.currentPos < this.caughtUpPos) {
+            this.promiseReject("Stream ended prematurely");
+        }
+    }
+}
+
+function appendBuffer(buffer1: ArrayBuffer, buffer2: ArrayBuffer): ArrayBuffer {
+    var tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
+    tmp.set(new Uint8Array(buffer1), 0);
+    tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
+    return tmp.buffer;
+};

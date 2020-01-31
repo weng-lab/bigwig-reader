@@ -225,8 +225,9 @@ export class BigWigReader {
      * @param treeOffset Location of the R+ tree that stores the data we're interested.
      * @param decodeFunction 
      */
-    private async loadData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, treeOffset: number,
-			      decodeFunction: DecodeFunction<T>, loadFunction: LoadFunction<T>): Promise<void> {
+    private async loadData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, 
+                treeOffset: number, streamMode: boolean, decodeFunction: DecodeFunction<T>, 
+                loadFunction: LoadFunction<T>): Promise<void> {
         const header = await this.getHeader();
         if (undefined == header.chromTree) {
             throw new FileFormatError("No chromosome tree found in file header.");
@@ -241,7 +242,7 @@ export class BigWigReader {
         }
 
         // Load all leaf nodes within given chr / base bounds for the R+ tree used for actually storing the data.
-        const bufferedLoader = new BufferedDataLoader(this.dataLoader, DEFAULT_BUFFER_SIZE);
+        const bufferedLoader = new BufferedDataLoader(this.dataLoader, DEFAULT_BUFFER_SIZE, streamMode);
         const magic = new BinaryParser(await bufferedLoader.load(treeOffset, RPTREE_HEADER_SIZE)).getUInt();
         if (IDX_MAGIC !== magic) {
             throw new FileFormatError(`R+ tree not found at offset ${treeOffset}`);
@@ -266,7 +267,7 @@ export class BigWigReader {
             treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
         const data: Array<T> = [];
         const load: LoadFunction<T> = (d: T[]) => data.push(...d);
-        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, decodeFunction, load);
+        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, false, decodeFunction, load);
         return data;
     };
 
@@ -276,7 +277,7 @@ export class BigWigReader {
         const load: LoadFunction<T> = (d: T[]) => {
             d.forEach((el) => stream.push(el));
         };
-        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, decodeFunction, load);
+        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, true, decodeFunction, load);
         stream.push(null);
         return stream;
     }
