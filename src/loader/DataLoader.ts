@@ -27,7 +27,7 @@ export interface DataLoader {
  */
 export class OutOfRangeError extends Error {
     errortype = ErrorType.OUT_OF_RANGE;
-    constructor(public resource: string, public start: number, public size?: number){
+    constructor(public resource: string, public start: number, public size?: number) {
         super(`Request on ${resource} out of range. Range given: ${start}-${size||''}`);
     }
 }
@@ -86,21 +86,20 @@ export class BufferedDataLoader {
     async load(start: number, size: number): Promise<ArrayBuffer> {
         // If the data isn't in the buffer, load it.
         if (!this.bufferContainsData(start, size)) {
-            // 
             if (!this.streamMode) {
-                await this.loadDataIntoBuffer(start);
+                await this.loadDataIntoBuffer(start, size);
             } else {
-                await this.streamDataIntoBuffer(start);
+                await this.streamDataIntoBuffer(start, size);
             }
         }
         
         return await this.getDataFromBuffer(start, size);
     }
 
-    private async loadDataIntoBuffer(start: number) {
+    private async loadDataIntoBuffer(start: number, size: number) {
         let data;
         try {
-            data = await this.dataLoader.load(start, this.bufferSize);
+            data = await this.dataLoader.load(start, Math.max(this.bufferSize, size));
         } catch (e) {
             // If we're out of range, it could mean reaching the end of the file, so retry without a size bound.
             if (e instanceof OutOfRangeError) {
@@ -116,7 +115,7 @@ export class BufferedDataLoader {
         };
     }
 
-    private async streamDataIntoBuffer(start: number) {
+    private async streamDataIntoBuffer(start: number, size: number) {
         if (this.dataLoader.loadStream === undefined) {
             throw Error("Stream mode enabled, but DataLoader loadStream function not defined");
         }
@@ -126,7 +125,7 @@ export class BufferedDataLoader {
             this.stream = undefined;
         }
         try {
-            this.stream = await this.dataLoader.loadStream(start, this.bufferSize);
+            this.stream = await this.dataLoader.loadStream(start, Math.max(this.bufferSize, size));
         } catch (e) {
             // If we're out of range, it could mean reaching the end of the file, so retry without a size bound.
             if (e instanceof OutOfRangeError) {

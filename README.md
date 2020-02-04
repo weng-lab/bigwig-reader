@@ -1,5 +1,6 @@
 # BigWig Reader
-A Typescript library for reading BigWig, BigBed, and Bam files. Heavily influenced by [igv.js](https://github.com/igvteam/igv.js). For use in the browser or on Node.js.
+A Typescript library for reading BigWig, BigBed, 2bit, and Bam files. Capable of streaming.
+For use in the browser or on Node.js.
 
 Brought to you by UMass Medical School, Weng Lab.
 
@@ -45,6 +46,33 @@ const bedData: BigBedData[] = await reader.readBigBedData("chr21", 10_000_000, "
 // Get zoom data (from BigWig or BigBed files)
 // You can find Zoom Level Index in HeaderData.zoomLevelHeaders.index
 const zoomData: BigZoomData[] = await reader.readZoomData("chr2", 0, "chr6", 1000, /* Zoom Level Index */ 9);
+```
+
+To stream "Big" data, just use the stream versions of these functions. For example:
+
+```typescript
+// Stream unzoomed wig data
+const wigDataStream: Readable = await reader.streamBigWigData("chr14", 19_485_000, "chr14", 20_000_100);
+
+// log bigwig data point objects as they are read in
+seqStream.on("data", (wigData: BigWigData) => console.log(wigData));
+```
+
+### Reading 2bit data
+
+To read 2bit file data do
+```typescript
+// Get sequence data from 2bit file for chr1:100000-200000
+const sequence: string = await reader.readTwoBitData("chr1", 100_000, 200_000);
+```
+
+To stream the same data do
+```typescript
+// Get a readable stream of sequence data
+const seqStream: Readable = await reader.streamTwoBitData("chr1", 100_000, 200_000, 1024 /* Optional chunk size */);
+
+// log sequence as it is read
+seqStream.on("data", (chunk: string) => console.log(chunk));
 ```
 
 ### Reading BAM data

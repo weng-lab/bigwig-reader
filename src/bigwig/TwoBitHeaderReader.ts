@@ -1,6 +1,7 @@
 import { DataLoader, BufferedDataLoader, FileFormatError, DataMissingError } from "../loader/DataLoader";
 import { BinaryParser } from "../util/BinaryParser";
 import { HeaderData, FileType } from "./BigWigHeaderReader";
+import { Readable } from "stream";
 
 const HEADER_BUFFER_SIZE = 32768;
 const BUFFER_SIZE = 3_000_000;
@@ -158,6 +159,24 @@ function rn(i: number): string {
     return retval;
 }
 
+export async function streamSequence(dataLoader: DataLoader, header: HeaderData, 
+        sequence: SequenceRecord, start: number, end: number, chunkSize: number = 1024): Promise<Readable> {
+    const dataToBuffer = Math.ceil((end - start) / 4) + 1;
+    const bufferedLoader = new BufferedDataLoader(dataLoader, dataToBuffer, true);
+    const stream = new Readable({ read() {}, encoding: 'utf8' });
+    let currentStart = start;
+    while (currentStart < end) {
+        let currentEnd = currentStart + chunkSize - 1;
+        if (currentEnd >= end) currentEnd = end;
+        const seq = await loadSequence(bufferedLoader, header, sequence, currentStart, currentEnd);
+        stream.push(seq);
+        currentStart = currentEnd + 1;
+    }
+    // This is the dumb way Readable streams are signalled to end.
+    stream.push(null);
+    return stream;
+}
+
 /**
  * Loads sequence data from a two-bit file.
  *
@@ -167,7 +186,7 @@ function rn(i: number): string {
  * @param start the start position on the chromsome, 0-based and inclusive.
  * @param end the end position on the chromosome, 0-based and not inclusive.
  */
-export async function loadSequence(dataLoader: DataLoader, header: HeaderData, 
+export async function loadSequence(dataLoader: DataLoader|BufferedDataLoader, header: HeaderData, 
         sequence: SequenceRecord, start: number, end: number): Promise<string> {
 
     let interruptingNBlocks = [], interruptingMaskBlocks = [];

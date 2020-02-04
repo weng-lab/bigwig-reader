@@ -1,7 +1,7 @@
 import { DataLoader, BufferedDataLoader, DataMissingError, FileFormatError } from "../loader/DataLoader";
 import { BinaryParser } from "../util/BinaryParser";
 import { loadHeaderData, HeaderData, FileType } from "./BigWigHeaderReader";
-import { loadSequenceRecord, loadSequence, SequenceRecord } from "./TwoBitHeaderReader";
+import { loadSequenceRecord, loadSequence, SequenceRecord, streamSequence } from "./TwoBitHeaderReader";
 import { inflate } from "pako";
 import { Stream, Readable, Writable, Duplex } from "stream";
 import { start } from "repl";
@@ -171,8 +171,20 @@ export class BigWigReader {
      * @param endBase the ending base.
      */
     async readTwoBitData(chrom: string, startBase: number, endBase: number): Promise<string> {
-	    let sequence: SequenceRecord = await this.getSequenceRecord(chrom);
+	    const sequence: SequenceRecord = await this.getSequenceRecord(chrom);
         return loadSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase);
+    }
+
+    /**
+     * Method for reading Two Bit sequence data from TwoBit files.
+     *
+     * @param chrom the chromosome from which to read.
+     * @param startBase the starting base.
+     * @param endBase the ending base.
+     */
+    async streamTwoBitData(chrom: string, startBase: number, endBase: number, chunkSize: number = 1024): Promise<Readable> {
+        const sequence: SequenceRecord = await this.getSequenceRecord(chrom);
+        return streamSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase, chunkSize);
     }
 
     /**
@@ -242,7 +254,7 @@ export class BigWigReader {
         }
 
         // Load all leaf nodes within given chr / base bounds for the R+ tree used for actually storing the data.
-        const bufferedLoader = new BufferedDataLoader(this.dataLoader, DEFAULT_BUFFER_SIZE, streamMode);
+        const bufferedLoader = new BufferedDataLoader(this.dataLoader, this.bufferSize, streamMode);
         const magic = new BinaryParser(await bufferedLoader.load(treeOffset, RPTREE_HEADER_SIZE)).getUInt();
         if (IDX_MAGIC !== magic) {
             throw new FileFormatError(`R+ tree not found at offset ${treeOffset}`);
