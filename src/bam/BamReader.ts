@@ -92,8 +92,7 @@ export class BamReader {
     private headerData?: BamHeader = undefined;
     async getHeaderData(): Promise<BamHeader> {
         if (this.headerData === undefined) {
-            const indexData = await this.getIndexData();
-            this.headerData = await readBamHeaderData(this.bamDataLoader, indexData.firstAlignmentBlock);
+            this.headerData = await readBamHeaderData(this.bamDataLoader);
         }
         return this.headerData;
     }
@@ -102,7 +101,7 @@ export class BamReader {
         const indexData = await this.getIndexData();
         const headerData = await this.getHeaderData();
         const refId = headerData.chromToId[chr];
-        const chunks: Array<Chunk> = blocksForRange(indexData.refData[refId], refId, start, end);
+        const chunks: Array<Chunk> = blocksForRange(indexData.refData[refId], start, end);
         return await readBam(this.bamDataLoader, chunks, refId, chr, start, end);
     }
 

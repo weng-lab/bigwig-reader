@@ -69,6 +69,9 @@ export class FileFormatError extends Error {
  * 
  * When you initially request data, potentially much more (bufferSize) than you ask for is loaded into a buffer.
  * This buffer is checked first for subsequent requests.
+ * 
+ * Can also be used for streaming. When this option is used, data is stored in the buffer until it's read,
+ * at which point the read data and all data preceding is deleted.
  */
 export class BufferedDataLoader {
 
@@ -80,7 +83,7 @@ export class BufferedDataLoader {
 
     constructor(
         private dataLoader: DataLoader, 
-        private bufferSize: number, 
+        private bufferSize?: number, 
         private streamMode: boolean = false) {}
 
     async load(start: number, size: number): Promise<ArrayBuffer> {
@@ -99,7 +102,8 @@ export class BufferedDataLoader {
     private async loadDataIntoBuffer(start: number, size: number) {
         let data;
         try {
-            data = await this.dataLoader.load(start, Math.max(this.bufferSize, size));
+            const loadEnd = this.bufferSize !== undefined ? Math.max(this.bufferSize, size) : undefined;
+            data = await this.dataLoader.load(start, loadEnd);
         } catch (e) {
             // If we're out of range, it could mean reaching the end of the file, so retry without a size bound.
             if (e instanceof OutOfRangeError) {
@@ -125,7 +129,8 @@ export class BufferedDataLoader {
             this.stream = undefined;
         }
         try {
-            this.stream = await this.dataLoader.loadStream(start, Math.max(this.bufferSize, size));
+            const loadEnd = this.bufferSize !== undefined ? Math.max(this.bufferSize, size) : undefined;
+            this.stream = await this.dataLoader.loadStream(start, loadEnd);
         } catch (e) {
             // If we're out of range, it could mean reaching the end of the file, so retry without a size bound.
             if (e instanceof OutOfRangeError) {
@@ -144,7 +149,9 @@ export class BufferedDataLoader {
 
         this.stream.on('data', (chunk: ArrayBuffer) => {
             buffer.data = appendBuffer(buffer.data, chunk);
-            buffer.remainingBytes = buffer.remainingBytes -= chunk.byteLength;
+            if (buffer.remainingBytes !== undefined) {
+                buffer.remainingBytes = buffer.remainingBytes -= chunk.byteLength;
+            }
             if (this.streamCaughtUpLock !== undefined) {
                 const dataEndPos = buffer.start + buffer.data.byteLength;
                 this.streamCaughtUpLock.updatePosition(dataEndPos);
@@ -159,6 +166,7 @@ export class BufferedDataLoader {
 
     private bufferContainsData(start: number, size: number): boolean {
         if (this.buffer === undefined) return false;
+        if (this.bufferSize === undefined) return true;
         const end = start + size;
         let bufferEnd = this.buffer.start + this.buffer.data.byteLength;
         if (this.buffer.remainingBytes !== undefined) {
