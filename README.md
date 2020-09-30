@@ -107,7 +107,7 @@ const bamHeader: BamHeader = await reader.getHeaderData();
 * Run `yarn build` to build.
 
 ### Testing
-You must have Node.js and docker-compose installed. 
+You must have [Node.js](https://www.npmjs.com/get-npm) and [docker-compose](https://www.docker.com/products/docker-desktop) installed. 
 * `scripts/test.sh` to run automated tests.
 * `scripts/run-dependencies.sh` to stand up a web server to host static sample BigWig and BigBed files. `scripts/test.sh` runs this for you.
 * `scripts/stop-dependencies.sh` to stop bring down the server.
