@@ -51,7 +51,7 @@ interface RPLeafNode {
     dataSize: number;
 }
 
-type ParseFunction<T> = (chrom: string, startBase: number, endBase: number, rest: string, binaryParser?: BinaryParser) => T;
+export type ParseFunction<T> = (chrom: string, startBase: number, endBase: number, rest: string) => T;
 
 const IDX_MAGIC = 0x2468ACE0;
 const RPTREE_HEADER_SIZE = 48;
@@ -150,7 +150,7 @@ export class BigWigReader {
     async readBigBedData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, restParser: ParseFunction<T>): Promise<Array<T>>;
     async readBigBedData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, restParser?: ParseFunction<T>): Promise<Array<(T | BigBedData)>> {
         return this.readData(startChrom, startBase, endChrom, endBase,
-            (await this.getHeader()).common!.fullIndexOffset, decodeBedData, restParser || parseBigBed as any);
+            (await this.getHeader()).common!.fullIndexOffset, decodeBedData(restParser || parseBigBed as any));
     }
 
     /**
@@ -166,7 +166,7 @@ export class BigWigReader {
     async streamBigBedData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, restParser: ParseFunction<T>): Promise<Readable>;
     async streamBigBedData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, restParser?: ParseFunction<T>): Promise<Readable> {
         return this.streamData<T>(startChrom, startBase, endChrom, endBase,
-            (await this.getHeader()).common!.fullIndexOffset, decodeBedData, restParser || parseBigBed as any);
+            (await this.getHeader()).common!.fullIndexOffset, decodeBedData(restParser || parseBigBed as any));
     }
 
     /**
@@ -245,7 +245,7 @@ export class BigWigReader {
      */
     private async loadData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number,
         treeOffset: number, streamMode: boolean, decodeFunction: DecodeFunction<T>,
-        loadFunction: LoadFunction<T>, restParser?: ParseFunction<T>): Promise<void> {
+        loadFunction: LoadFunction<T>): Promise<void> {
         const header = await this.getHeader();
         if (undefined == header.chromTree) {
             throw new FileFormatError("No chromosome tree found in file header.");
@@ -275,27 +275,27 @@ export class BigWigReader {
             if (header.common!.uncompressBuffSize > 0) {
                 leafData = inflate(leafData);
             }
-            let leafDecodedData = decodeFunction(leafData.buffer as ArrayBuffer, startChromIndex, startBase, endChromIndex,
-                endBase, header.chromTree.idToChrom, restParser);
+
+            let leafDecodedData = decodeFunction(leafData.buffer as ArrayBuffer, startChromIndex, startBase, endChromIndex, endBase, header.chromTree.idToChrom);
             loadFunction(leafDecodedData);
         }
     }
 
     private async readData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number,
-        treeOffset: number, decodeFunction: DecodeFunction<T>, restParser?: ParseFunction<T>): Promise<Array<T>> {
+        treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
         const data: Array<T> = [];
         const load: LoadFunction<T> = (d: T[]) => data.push(...d);
-        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, false, decodeFunction, load, restParser);
+        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, false, decodeFunction, load);
         return data;
     }
 
     private async streamData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number,
-        treeOffset: number, decodeFunction: DecodeFunction<T>, restParser?: ParseFunction<T>): Promise<Readable> {
+        treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Readable> {
         const stream = new Readable({ objectMode: true, read() { } });
         const load: LoadFunction<T> = (d: T[]) => {
             d.forEach((el) => stream.push(el));
         };
-        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, true, decodeFunction, load, restParser);
+        await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, true, decodeFunction, load);
         stream.push(null);
         return stream;
     }
@@ -359,7 +359,7 @@ async function loadLeafNodesForRPNode(bufferedLoader: BufferedDataLoader, little
 }
 
 type DecodeFunction<T> = (data: ArrayBuffer, startChromIndex: number, startBase: number, endChromIndex: number,
-    endBase: number, chromDict: Array<string>, restParser?: ParseFunction<T>) => Array<T>;
+    endBase: number, chromDict: Array<string>) => Array<T>;
 
 type LoadFunction<T> = (data: Array<T>) => void;
  
@@ -425,18 +425,22 @@ export function parseBigBed(chrom: string, startBase: number, endBase: number, r
 
 /**
  * Extract useful data from sections of raw big binary bed data
- * 
  * @template T
- * @param data Raw bed data
- * @param filterStartChromIndex starting chromosome index used for filtering
- * @param filterStartBase starting base used for filtering
- * @param filterEndChromIndex ending chromosome index used for filtering
- * @param filterEndBase ending base used for filtering
- * @param chromDict dictionary of indices used by the file to chromosome names, conveniently stored as an array.
- * @param [restParser] Parse for getting data
- */
-function decodeBedData<T>(data: ArrayBuffer, filterStartChromIndex: number, filterStartBase: number, filterEndChromIndex: number,
-    filterEndBase: number, chromDict: Array<string>, restParser?: ParseFunction<T>): Array<T> {
+ * @params restParser Parser for reading big bed data
+ * @returns
+ *  The big bed Decode function
+ *  @template T
+ *  @param data Raw bed data
+ *  @param filterStartChromIndex starting chromosome index used for filtering
+ *  @param filterStartBase starting base used for filtering
+ *  @param filterEndChromIndex ending chromosome index used for filtering
+ *  @param filterEndBase ending base used for filtering
+ *  @param chromDict dictionary of indices used by the file to chromosome names, conveniently stored as an array.
+ *  @param [restParser] Parse for getting data
+ * 
+*/
+const decodeBedData = <T>(restParser: ParseFunction<T>) => (data: ArrayBuffer, filterStartChromIndex: number, filterStartBase: number, filterEndChromIndex: number,
+    filterEndBase: number, chromDict: Array<string>): Array<T> => {
     const decodedData: Array<T> = [];
     const binaryParser = new BinaryParser(data);
     const minSize = 3 * 4 + 1;    // Minimum # of bytes required for a bed record
@@ -454,10 +458,8 @@ function decodeBedData<T>(data: ArrayBuffer, filterStartChromIndex: number, filt
             break;
         }
 
-        if (!!restParser) {
-            const entry: T = restParser!(chrom, startBase, endBase, rest);
-            decodedData.push(entry);
-        }
+        const entry: T = restParser(chrom, startBase, endBase, rest);
+        decodedData.push(entry);
     }
 
     return decodedData;
