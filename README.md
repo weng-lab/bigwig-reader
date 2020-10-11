@@ -1,4 +1,4 @@
-# BigWig Reader
+# Genomic Reader
 A Typescript library for reading BigWig, BigBed, 2bit, and Bam files. Capable of streaming.
 For use in the browser or on Node.js.
 
@@ -14,7 +14,7 @@ For yarn use: `yarn add bigwig-reader`
 
 ### Importing
 ```typescript
-import { AxiosDataLoader, BigWigReader } from "bigwig-reader";
+import { AxiosDataLoader, BigWigReader } from "genomic-reader";
 ```
 
 ### Creating readers
