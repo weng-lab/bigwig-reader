@@ -51,6 +51,8 @@ interface RPLeafNode {
     dataSize: number;
 }
 
+export type ParseFunction<T> = (chrom: string, startBase: number, endBase: number, rest: string) => T;
+
 const IDX_MAGIC = 0x2468ACE0;
 const RPTREE_HEADER_SIZE = 48;
 const RPTREE_NODE_LEAF_ITEM_SIZE = 32;
@@ -77,10 +79,10 @@ export class BigWigReader {
      * Gets the type of the underlying file.
      */
     async fileType(): Promise<FileType> {
-	    let header: HeaderData = await this.getHeader();
-	    return header.fileType;
+        let header: HeaderData = await this.getHeader();
+        return header.fileType;
     }
-    
+
     /**
      * Method for getting all header data for dataLoader's file. Data is loaded on demand and cached for subsequent requests.
      */
@@ -97,14 +99,14 @@ export class BigWigReader {
      * @param chrom the name of the chromosome or other sequence to retrieve.
      */
     async getSequenceRecord(chrom: string): Promise<SequenceRecord> {
-	    let header: HeaderData = await this.getHeader();
-	    if (header.fileType !== FileType.TwoBit) throw new FileFormatError("getSequenceRecord is not valid on " + header.fileType + " files.");
-	    if (!this.cachedSequenceRecords[chrom]) {
+        let header: HeaderData = await this.getHeader();
+        if (header.fileType !== FileType.TwoBit) throw new FileFormatError("getSequenceRecord is not valid on " + header.fileType + " files.");
+        if (!this.cachedSequenceRecords[chrom]) {
             this.cachedSequenceRecords[chrom] = await loadSequenceRecord(this.dataLoader, header, chrom);
         }
-	    return this.cachedSequenceRecords[chrom];
+        return this.cachedSequenceRecords[chrom];
     }
-    
+
     /**
      * Method for reading unzoomed wig data from BigWig files.
      * 
@@ -114,9 +116,9 @@ export class BigWigReader {
      * @param endBase Ending base pair
      * @param zoomLevelIndex The ZoomLevelHeader.index from the zoom level you want to read from. 
      */
-    async readBigWigData(startChrom: string, startBase: number, endChrom: string, 
-            endBase: number): Promise<Array<BigWigData>> {
-        return this.readData<BigWigData>(startChrom, startBase, endChrom, endBase, 
+    async readBigWigData(startChrom: string, startBase: number, endChrom: string,
+        endBase: number): Promise<Array<BigWigData>> {
+        return this.readData<BigWigData>(startChrom, startBase, endChrom, endBase,
             (await this.getHeader()).common!.fullIndexOffset, decodeWigData);
     }
 
@@ -129,9 +131,9 @@ export class BigWigReader {
      * @param endBase Ending base pair
      * @param zoomLevelIndex The ZoomLevelHeader.index from the zoom level you want to read from. 
      */
-    async streamBigWigData(startChrom: string, startBase: number, endChrom: string, 
-            endBase: number): Promise<Readable> {
-        return this.streamData<BigWigData>(startChrom, startBase, endChrom, endBase, 
+    async streamBigWigData(startChrom: string, startBase: number, endChrom: string,
+        endBase: number): Promise<Readable> {
+        return this.streamData<BigWigData>(startChrom, startBase, endChrom, endBase,
             (await this.getHeader()).common!.fullIndexOffset, decodeWigData);
     }
 
@@ -142,11 +144,13 @@ export class BigWigReader {
      * @param startBase Starting base pair
      * @param endChrom Ending chromose
      * @param endBase Ending base pair
+     * @param [restParser] Parser for reading data
      */
-    async readBigBedData(startChrom: string, startBase: number, endChrom: string, 
-            endBase: number): Promise<Array<BigBedData>> {
-        return this.readData<BigBedData>(startChrom, startBase, endChrom, endBase, 
-            (await this.getHeader()).common!.fullIndexOffset, decodeBedData);
+    async readBigBedData(startChrom: string, startBase: number, endChrom: string, endBase: number): Promise<Array<BigBedData>>;
+    async readBigBedData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, restParser: ParseFunction<T>): Promise<Array<T>>;
+    async readBigBedData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, restParser?: ParseFunction<T>): Promise<Array<(T | BigBedData)>> {
+        return this.readData(startChrom, startBase, endChrom, endBase,
+            (await this.getHeader()).common!.fullIndexOffset, decodeBedData(restParser || parseBigBed as any));
     }
 
     /**
@@ -156,11 +160,13 @@ export class BigWigReader {
      * @param startBase Starting base pair
      * @param endChrom Ending chromose
      * @param endBase Ending base pair
+     * @param [restParser] Parser for reading data
      */
-    async streamBigBedData(startChrom: string, startBase: number, endChrom: string, 
-            endBase: number): Promise<Readable> {
-        return this.streamData<BigBedData>(startChrom, startBase, endChrom, endBase, 
-            (await this.getHeader()).common!.fullIndexOffset, decodeBedData);
+    async streamBigBedData(startChrom: string, startBase: number, endChrom: string, endBase: number): Promise<Readable>;
+    async streamBigBedData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, restParser: ParseFunction<T>): Promise<Readable>;
+    async streamBigBedData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, restParser?: ParseFunction<T>): Promise<Readable> {
+        return this.streamData<T>(startChrom, startBase, endChrom, endBase,
+            (await this.getHeader()).common!.fullIndexOffset, decodeBedData(restParser || parseBigBed as any));
     }
 
     /**
@@ -171,7 +177,7 @@ export class BigWigReader {
      * @param endBase the ending base.
      */
     async readTwoBitData(chrom: string, startBase: number, endBase: number): Promise<string> {
-	    const sequence: SequenceRecord = await this.getSequenceRecord(chrom);
+        const sequence: SequenceRecord = await this.getSequenceRecord(chrom);
         return loadSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase);
     }
 
@@ -196,14 +202,14 @@ export class BigWigReader {
      * @param endBase Ending base pair
      * @param zoomLevelIndex index of the zoom level. You can call getHeader() for a list of these values under HeaderData.zoomLevelHeaders.
      */
-    async readZoomData(startChrom: string, startBase: number, endChrom: string, endBase: number, 
-            zoomLevelIndex: number): Promise<Array<BigZoomData>> {
+    async readZoomData(startChrom: string, startBase: number, endChrom: string, endBase: number,
+        zoomLevelIndex: number): Promise<Array<BigZoomData>> {
         const header = await this.getHeader();
         if (undefined == header.zoomLevelHeaders || !(zoomLevelIndex in header.zoomLevelHeaders)) {
             throw new FileFormatError("Given zoomLevelIndex not found in zoom level headers.");
         }
         const treeOffset = header.zoomLevelHeaders[zoomLevelIndex].indexOffset;
-        return this.readData<BigZoomData>(startChrom, startBase, endChrom, endBase, 
+        return this.readData<BigZoomData>(startChrom, startBase, endChrom, endBase,
             treeOffset, decodeZoomData);
     }
 
@@ -216,14 +222,14 @@ export class BigWigReader {
      * @param endBase Ending base pair
      * @param zoomLevelIndex index of the zoom level. You can call getHeader() for a list of these values under HeaderData.zoomLevelHeaders.
      */
-    async streamZoomData(startChrom: string, startBase: number, endChrom: string, endBase: number, 
-            zoomLevelIndex: number): Promise<Readable> {
+    async streamZoomData(startChrom: string, startBase: number, endChrom: string, endBase: number,
+        zoomLevelIndex: number): Promise<Readable> {
         const header = await this.getHeader();
         if (undefined == header.zoomLevelHeaders || !(zoomLevelIndex in header.zoomLevelHeaders)) {
             throw new FileFormatError("Given zoomLevelIndex not found in zoom level headers.");
         }
         const treeOffset = header.zoomLevelHeaders[zoomLevelIndex].indexOffset;
-        return this.streamData<BigZoomData>(startChrom, startBase, endChrom, endBase, 
+        return this.streamData<BigZoomData>(startChrom, startBase, endChrom, endBase,
             treeOffset, decodeZoomData);
     }
 
@@ -237,9 +243,9 @@ export class BigWigReader {
      * @param treeOffset Location of the R+ tree that stores the data we're interested.
      * @param decodeFunction 
      */
-    private async loadData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, 
-                treeOffset: number, streamMode: boolean, decodeFunction: DecodeFunction<T>, 
-                loadFunction: LoadFunction<T>): Promise<void> {
+    private async loadData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number,
+        treeOffset: number, streamMode: boolean, decodeFunction: DecodeFunction<T>,
+        loadFunction: LoadFunction<T>): Promise<void> {
         const header = await this.getHeader();
         if (undefined == header.chromTree) {
             throw new FileFormatError("No chromosome tree found in file header.");
@@ -260,7 +266,7 @@ export class BigWigReader {
             throw new FileFormatError(`R+ tree not found at offset ${treeOffset}`);
         }
         const rootNodeOffset = treeOffset + RPTREE_HEADER_SIZE;
-        const leafNodes: Array<RPLeafNode> = await loadLeafNodesForRPNode(bufferedLoader, header.littleEndian, rootNodeOffset, 
+        const leafNodes: Array<RPLeafNode> = await loadLeafNodesForRPNode(bufferedLoader, header.littleEndian, rootNodeOffset,
             startChromIndex, startBase, endChromIndex, endBase);
 
         // Iterate through filtered leaf nodes, load the data, and decode it
@@ -269,23 +275,23 @@ export class BigWigReader {
             if (header.common!.uncompressBuffSize > 0) {
                 leafData = inflate(leafData);
             }
-            let leafDecodedData = decodeFunction(leafData.buffer as ArrayBuffer, startChromIndex, startBase, endChromIndex, 
-                endBase, header.chromTree.idToChrom);
+
+            let leafDecodedData = decodeFunction(leafData.buffer as ArrayBuffer, startChromIndex, startBase, endChromIndex, endBase, header.chromTree.idToChrom);
             loadFunction(leafDecodedData);
         }
     }
 
-    private async readData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, 
-            treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
+    private async readData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number,
+        treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Array<T>> {
         const data: Array<T> = [];
         const load: LoadFunction<T> = (d: T[]) => data.push(...d);
         await this.loadData(startChrom, startBase, endChrom, endBase, treeOffset, false, decodeFunction, load);
         return data;
-    };
+    }
 
-    private async streamData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number, 
-            treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Readable> {
-        const stream = new Readable({ objectMode: true, read() {} });
+    private async streamData<T>(startChrom: string, startBase: number, endChrom: string, endBase: number,
+        treeOffset: number, decodeFunction: DecodeFunction<T>): Promise<Readable> {
+        const stream = new Readable({ objectMode: true, read() { } });
         const load: LoadFunction<T> = (d: T[]) => {
             d.forEach((el) => stream.push(el));
         };
@@ -293,8 +299,8 @@ export class BigWigReader {
         stream.push(null);
         return stream;
     }
-
 }
+
 
 /**
  * Recursively load a list of R+ tree leaf nodes for the given node (by file offset) within given chr / base bounds.
@@ -308,7 +314,7 @@ export class BigWigReader {
  * @returns List of simple representations of leaf nodes for the given node offset.
  */
 async function loadLeafNodesForRPNode(bufferedLoader: BufferedDataLoader, littleEndian: boolean, rpNodeOffset: number, startChromIndex: number,
-        startBase: number, endChromIndex: number, endBase: number): Promise<Array<RPLeafNode>> {
+    startBase: number, endChromIndex: number, endBase: number): Promise<Array<RPLeafNode>> {
     const nodeHeaderData: ArrayBuffer = await bufferedLoader.load(rpNodeOffset, 4);
     const nodeHeaderParser = new BinaryParser(nodeHeaderData, littleEndian);
     const isLeaf = 1 === nodeHeaderParser.getByte();
@@ -356,7 +362,7 @@ type DecodeFunction<T> = (data: ArrayBuffer, startChromIndex: number, startBase:
     endBase: number, chromDict: Array<string>) => Array<T>;
 
 type LoadFunction<T> = (data: Array<T>) => void;
-
+ 
 /**
  * Extract useful data from sections of raw big binary bed data
  * 
@@ -367,12 +373,78 @@ type LoadFunction<T> = (data: Array<T>) => void;
  * @param filterEndBase ending base used for filtering
  * @param chromDict dictionary of indices used by the file to chromosome names, conveniently stored as an array.
  */
-function decodeBedData(data: ArrayBuffer, filterStartChromIndex: number, filterStartBase: number, filterEndChromIndex: number,
-        filterEndBase: number, chromDict: Array<string>): Array<BigBedData> {
-    const decodedData: Array<BigBedData> = [];
-    const binaryParser = new BinaryParser(data);
+export function parseBigBed(chrom: string, startBase: number, endBase: number, rest: string): BigBedData {
+    const entry: BigBedData = {
+        chr: chrom,
+        start: startBase,
+        end: endBase
+    }
 
+    let tokens = rest.split("\t");
+    if (tokens.length > 0) {
+        entry.name = tokens[0];
+    }
+    if (tokens.length > 1) {
+        entry.score = parseFloat(tokens[1]);
+    }
+    if (tokens.length > 2) {
+        entry.strand = tokens[2];
+    }
+    if (tokens.length > 3) {
+        entry.cdStart = parseInt(tokens[3]);
+    }
+    if (tokens.length > 4) {
+        entry.cdEnd = parseInt(tokens[4]);
+    }
+    if (tokens.length > 5 && tokens[5] !== "." && tokens[5] !== "0") {
+        let color: string;
+        if (tokens[5].includes(",")) {
+            color = tokens[5].startsWith("rgb") ? tokens[5] : "rgb(" + tokens[5] + ")";
+        } else {
+            color = tokens[5];
+        }
+        entry.color = color;
+    }
+    if (tokens.length > 8) {
+        const exonCount = parseInt(tokens[6]);
+        const exonSizes = tokens[7].split(',');
+        const exonStarts = tokens[8].split(',');
+        const exons: Array<BigBedExon> = [];
+
+        for (var i = 0; i < exonCount; i++) {
+            const eStart = startBase + parseInt(exonStarts[i]);
+            const eEnd = eStart + parseInt(exonSizes[i]);
+            exons.push({ start: eStart, end: eEnd });
+        }
+
+        entry.exons = exons;
+    }
+
+    return entry;
+}
+
+/**
+ * Extract useful data from sections of raw big binary bed data
+ * @template T
+ * @params restParser Parser for reading big bed data
+ * @returns
+ *  The big bed Decode function
+ *  @template T
+ *  @param data Raw bed data
+ *  @param filterStartChromIndex starting chromosome index used for filtering
+ *  @param filterStartBase starting base used for filtering
+ *  @param filterEndChromIndex ending chromosome index used for filtering
+ *  @param filterEndBase ending base used for filtering
+ *  @param chromDict dictionary of indices used by the file to chromosome names, conveniently stored as an array.
+ *  @param [restParser] Parse for getting data
+ * 
+*/
+const decodeBedData = <T>(restParser: ParseFunction<T>) => (data: ArrayBuffer, filterStartChromIndex: number, filterStartBase: number, filterEndChromIndex: number,
+    filterEndBase: number, chromDict: Array<string>): Array<T> => {
+    const decodedData: Array<T> = [];
+    const binaryParser = new BinaryParser(data);
     const minSize = 3 * 4 + 1;    // Minimum # of bytes required for a bed record
+
     while (binaryParser.remLength() >= minSize) {
         const chromIndex = binaryParser.getInt();
         const chrom = chromDict[chromIndex];
@@ -386,51 +458,7 @@ function decodeBedData(data: ArrayBuffer, filterStartChromIndex: number, filterS
             break;
         }
 
-        const entry: BigBedData = {
-            chr: chrom,
-            start: startBase,
-            end: endBase
-        }
-
-        let tokens = rest.split("\t");
-        if (tokens.length > 0) {
-            entry.name = tokens[0];
-        }
-        if (tokens.length > 1) {
-            entry.score = parseFloat(tokens[1]);
-        }
-        if (tokens.length > 2) {
-            entry.strand = tokens[2];
-        }
-        if (tokens.length > 3) {
-            entry.cdStart = parseInt(tokens[3]);
-        }
-        if (tokens.length > 4) {
-            entry.cdEnd = parseInt(tokens[4]);
-        }
-        if (tokens.length > 5 && tokens[5] !== "." && tokens[5] !== "0") {
-            let color: string;
-            if (tokens[5].includes(",")) {
-                color = tokens[5].startsWith("rgb") ? tokens[5] : "rgb(" + tokens[5] + ")";
-            } else {
-                color = tokens[5];
-            }
-            entry.color = color;
-        }
-        if (tokens.length > 8) {
-            const exonCount = parseInt(tokens[6]);
-            const exonSizes = tokens[7].split(',');
-            const exonStarts = tokens[8].split(',');
-            const exons: Array<BigBedExon> = [];
-
-            for (var i = 0; i < exonCount; i++) {
-                const eStart = startBase + parseInt(exonStarts[i]);
-                const eEnd = eStart + parseInt(exonSizes[i]);
-                exons.push({ start: eStart, end: eEnd });
-            }
-
-            entry.exons = exons;
-        }
+        const entry: T = restParser(chrom, startBase, endBase, rest);
         decodedData.push(entry);
     }
 
@@ -448,7 +476,7 @@ function decodeBedData(data: ArrayBuffer, filterStartChromIndex: number, filterS
  * @param chromDict dictionary of indices used by the file to chromosome names, conveniently stored as an array.
  */
 function decodeWigData(data: ArrayBuffer, filterStartChromIndex: number, filterStartBase: number, filterEndChromIndex: number,
-        filterEndBase: number, chromDict: Array<string>): Array<BigWigData> {
+    filterEndBase: number, chromDict: Array<string>): Array<BigWigData> {
     const decodedData: Array<BigWigData> = [];
     const binaryParser = new BinaryParser(data);
 
@@ -484,22 +512,22 @@ function decodeWigData(data: ArrayBuffer, filterStartChromIndex: number, filterS
             endBase = startBase + itemSpan;
         }
 
-	if (chromIndex > filterEndChromIndex || (chromIndex === filterEndChromIndex && startBase >= filterEndBase)) {
-	    break; // past the end of the range; exit
-	} else if (!(chromIndex < filterStartChromIndex || (chromIndex === filterStartChromIndex && endBase < filterStartBase))) {
-	    decodedData.push({
-		chr: chrom,
-		start: startBase,
-		end: endBase,
-		value: value
+        if (chromIndex > filterEndChromIndex || (chromIndex === filterEndChromIndex && startBase >= filterEndBase)) {
+            break; // past the end of the range; exit
+        } else if (!(chromIndex < filterStartChromIndex || (chromIndex === filterStartChromIndex && endBase < filterStartBase))) {
+            decodedData.push({
+                chr: chrom,
+                start: startBase,
+                end: endBase,
+                value: value
             }); // this is within the range (i.e. not before the first requested base); add this datapoint
         }
 
-	if (1 !== type && 2 !== type) {
-	    // data is stored in Fixed Step format
-	    // only increment the start base once the last entry has been pushed
-	    startBase += itemStep;
-	}
+        if (1 !== type && 2 !== type) {
+            // data is stored in Fixed Step format
+            // only increment the start base once the last entry has been pushed
+            startBase += itemStep;
+        }
     }
     return decodedData;
 }
@@ -515,7 +543,7 @@ function decodeWigData(data: ArrayBuffer, filterStartChromIndex: number, filterS
  * @param chromDict dictionary of indices used by the file to chromosome names, conveniently stored as an array.
  */
 function decodeZoomData(data: ArrayBuffer, filterStartChromIndex: number, filterStartBase: number, filterEndChromIndex: number,
-        filterEndBase: number, chromDict: Array<string>): Array<BigZoomData> {
+    filterEndBase: number, chromDict: Array<string>): Array<BigZoomData> {
     const decodedData: Array<BigZoomData> = [];
     const binaryParser = new BinaryParser(data);
 

@@ -1,2 +1,6 @@
 export { HeaderData, FileType, CommonHeader, ZoomLevelHeader, BWTotalSummary, ChromTree } from "./BigWigHeaderReader";
-export { BigWigData, BigBedData, BigZoomData, BigWigReader } from "./BigWigReader";
+export {
+    BigBedDataNarrowPeak, BigBedDataBroadPeak, BigBedDataMethyl, BigBedDataTssPeak, BigBedDataIdrPeak,
+    parseBigBedBroadPeak, parseBigBedIdrPeak, parseBigBedMethyl, parseBigBedNarrowPeak, parseBigBedTssPeak
+} from "./encodeBigBed";
+export { BigWigData, BigBedData, BigZoomData, BigWigReader, parseBigBed } from "./BigWigReader";
