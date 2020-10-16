@@ -4,3 +4,4 @@ export {
     parseBigBedBroadPeak, parseBigBedIdrPeak, parseBigBedMethyl, parseBigBedNarrowPeak, parseBigBedTssPeak
 } from "./encodeBigBed";
 export { BigWigData, BigBedData, BigZoomData, BigWigReader, parseBigBed, ParseFunction } from "./BigWigReader";
+
