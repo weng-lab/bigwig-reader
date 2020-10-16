@@ -38,7 +38,8 @@ export interface BigBedDataMethyl {
     end: number,
     name?: string,
     score?: number,
-    strand?: string,     // + or - or . for unknown
+    // + or - or . for unknown
+    strand?: string,
     // Start of where display should be thick (start codon)
     thickStart?: number,
     // End of where display should be thick (stop codon)

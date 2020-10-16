@@ -8,7 +8,7 @@ import { streamToArray } from "./testUtils";
 const testBWFilename = "testbw.bigwig";
 const testBWFixedStepName = "test.fixedstep.bigwig";
 const testBBFilename = "testbb.bigbed";
-const testBBNarrowPeakFilename = "testbb-narrowpeak.bigBed";
+const testBBNarrowPeakFilename = "testbb-narrowpeak.bigbed";
 const testBBBroadPeakFilename = "testbb-broadpeak.bigbed";
 const testBBMethylFilename = "testbb-methyl.bigbed";
 const testBBIdrPeakFilename = "testbb-idrpeak.bigbed";
@@ -30,7 +30,6 @@ describe("BigWigReader", () => {
         const loader = new AxiosDataLoader(`http://localhost:8001/${testBWFilename}`, Axios.create());
         const reader = new BigWigReader(loader);
         const data = await reader.readBigWigData("chr14", 19_485_000, "chr14", 20_000_100);
-
         expect(data.length).toBe(83);
         expect(data[0]).toEqual({
             chr: "chr14", 
@@ -127,7 +126,6 @@ describe("BigWigReader", () => {
         expect(data[0].exons![0].start).toBe(9_928_613);
         expect(data[0].exons![0].end).toBe(9_928_911);
     });
-
 
     it("should read unzoomed narrow peak bigbed data", async () => {
         const loader = new AxiosDataLoader(`http://localhost:8001/${testBBNarrowPeakFilename}`, Axios.create());
