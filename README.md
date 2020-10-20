@@ -6,9 +6,9 @@ Brought to you by UMass Medical School, Weng Lab.
 
 ## Installation
 
-For npm use: `npm install bigwig-reader`
+For npm use: `npm install genomic-reader`
 
-For yarn use: `yarn add bigwig-reader`
+For yarn use: `yarn add genomic-reader`
 
 ## Usage
 
