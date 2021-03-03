@@ -15,6 +15,18 @@ function chararray(): (i: number) => string {
     return (i: number): string => CHARARRAY[i];
 };
 
+const letters: Record<string,number[]>  ={
+    A: [1,0,0,0],
+    C: [0,1,0,0],
+    G: [0,0,1,0],
+    T: [0,0,0,1],
+    N: [0,0,0,0],
+    a: [1,0,0,0],
+    c: [0,1,0,0],
+    g: [0,0,1,0],
+    t: [0,0,0,1],
+    n: [0,0,0,0]
+}
 /**
  * Decodes a byte to a sequence of bases.
  *
@@ -176,6 +188,16 @@ export async function streamSequence(dataLoader: DataLoader, header: HeaderData,
     stream.push(null);
     return stream;
 }
+
+export async function loadOneHotEncodingFromSequence(dataLoader: DataLoader|BufferedDataLoader, header: HeaderData, 
+    sequence: SequenceRecord, start: number, end: number):Promise<Array<Array<number>>> {
+    const seq = await loadSequence(dataLoader, header, sequence, start, end)       
+    let matrix: number[][] = []
+    for(let c of seq) {   
+        matrix.push(letters[c])
+    }    
+    return matrix;    
+} 
 
 /**
  * Loads sequence data from a two-bit file.

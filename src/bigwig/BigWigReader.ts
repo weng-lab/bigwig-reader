@@ -1,7 +1,7 @@
 import { DataLoader, BufferedDataLoader, DataMissingError, FileFormatError } from "../loader/DataLoader";
 import { BinaryParser } from "../util/BinaryParser";
 import { loadHeaderData, HeaderData, FileType } from "./BigWigHeaderReader";
-import { loadSequenceRecord, loadSequence, SequenceRecord, streamSequence } from "./TwoBitHeaderReader";
+import { loadSequenceRecord, loadSequence, SequenceRecord, streamSequence, loadOneHotEncodingFromSequence } from "./TwoBitHeaderReader";
 import { inflate } from "pako";
 import { Stream, Readable, Writable, Duplex } from "stream";
 import { start } from "repl";
@@ -181,6 +181,17 @@ export class BigWigReader {
         return loadSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase);
     }
 
+    /**
+     * Method for reading Two Bit Matrix data from TwoBit files.
+     *
+     * @param chrom the chromosome from which to read.
+     * @param startBase the starting base.
+     * @param endBase the ending base.
+     */
+    async readTwoBitDataMatrix(chrom: string, startBase: number, endBase: number): Promise<Array<Array<number>>> {
+        const sequence: SequenceRecord = await this.getSequenceRecord(chrom);
+        return loadOneHotEncodingFromSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase);
+    }
     /**
      * Method for reading Two Bit sequence data from TwoBit files.
      *
