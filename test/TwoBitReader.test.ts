@@ -68,4 +68,16 @@ describe("TwoBitReader", () => {
 		expect(chunkSizes).toEqual([32, 32, 32, 27]);
 	});
 
+	it("should stream one hot encoded data from seq1", async () => {
+		const loader = new AxiosDataLoader(`http://localhost:8001/${testTwoBitFilename}`, Axios.create());
+		const reader = new BigWigReader(loader);
+		const stream = await reader.streamTwoBitData("seq1", 2, 4, undefined, true);
+		const chunks: string[] = await streamToArray(stream);
+		
+		expect(chunks[0]).toStrictEqual([[0,1,0,0],[0,0,0,1],[0,0,1,0]]);
+
+		const chunkSizes = chunks.map((ch) => ch.length);
+		expect(chunkSizes).toEqual([3]);
+	});
+
 });

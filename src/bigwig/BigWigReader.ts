@@ -199,9 +199,9 @@ export class BigWigReader {
      * @param startBase the starting base.
      * @param endBase the ending base.
      */
-    async streamTwoBitData(chrom: string, startBase: number, endBase: number, chunkSize: number = 1024): Promise<Readable> {
+    async streamTwoBitData(chrom: string, startBase: number, endBase: number, chunkSize: number = 1024, oneHotEncodedData= false): Promise<Readable> {
         const sequence: SequenceRecord = await this.getSequenceRecord(chrom);
-        return streamSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase, chunkSize);
+        return streamSequence(this.dataLoader, this.cachedHeader!, sequence, startBase, endBase, chunkSize, oneHotEncodedData);
     }
 
     /**
