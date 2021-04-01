@@ -15,6 +15,18 @@ function chararray(): (i: number) => string {
     return (i: number): string => CHARARRAY[i];
 };
 
+const letters: Record<string,number[]>  ={
+    A: [1,0,0,0],
+    C: [0,1,0,0],
+    G: [0,0,1,0],
+    T: [0,0,0,1],
+    N: [0,0,0,0],
+    a: [1,0,0,0],
+    c: [0,1,0,0],
+    g: [0,0,1,0],
+    t: [0,0,0,1],
+    n: [0,0,0,0]
+}
 /**
  * Decodes a byte to a sequence of bases.
  *
@@ -160,22 +172,45 @@ function rn(i: number): string {
 }
 
 export async function streamSequence(dataLoader: DataLoader, header: HeaderData, 
-        sequence: SequenceRecord, start: number, end: number, chunkSize: number = 1024): Promise<Readable> {
+        sequence: SequenceRecord, start: number, end: number, chunkSize: number = 1024, oneHotEncodedData= false): Promise<Readable> {
     const dataToBuffer = Math.ceil((end - start) / 4) + 1;
     const bufferedLoader = new BufferedDataLoader(dataLoader, dataToBuffer, true);
     const stream = new Readable({ read() {}, encoding: 'utf8' });
+    const matrixStream = new Readable({ read() {}, objectMode: true });
     let currentStart = start;
     while (currentStart < end) {
         let currentEnd = currentStart + chunkSize - 1;
         if (currentEnd >= end) currentEnd = end;
-        const seq = await loadSequence(bufferedLoader, header, sequence, currentStart, currentEnd);
-        stream.push(seq);
+        if(oneHotEncodedData) {
+            const matrix  = await loadOneHotEncodingFromSequence(bufferedLoader, header, sequence, currentStart, currentEnd);
+            matrixStream.push(matrix)
+        } else {
+            const seq = await loadSequence(bufferedLoader, header, sequence, currentStart, currentEnd);
+            stream.push(seq);
+        }       
         currentStart = currentEnd + 1;
     }
     // This is the dumb way Readable streams are signalled to end.
-    stream.push(null);
-    return stream;
+    
+    if(oneHotEncodedData)
+    {   
+        matrixStream.push(null);
+        return matrixStream;
+
+    } else {
+        stream.push(null);
+        return stream;
+    }
 }
+export async function loadOneHotEncodingFromSequence(dataLoader: DataLoader|BufferedDataLoader, header: HeaderData, 
+    sequence: SequenceRecord, start: number, end: number):Promise<Array<Array<number>>> {
+    const seq = await loadSequence(dataLoader, header, sequence, start, end)       
+    let matrix: number[][] = []
+    for(let c of seq) {   
+        matrix.push(letters[c])
+    }    
+    return matrix;    
+} 
 
 /**
  * Loads sequence data from a two-bit file.
